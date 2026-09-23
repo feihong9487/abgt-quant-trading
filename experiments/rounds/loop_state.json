@@ -2,7 +2,7 @@
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
   "updated": "2026-09-23T21:20+08:00",
   "round": 4,
-  "status": "round_4_done_paper_forward_next",
+  "status": "levers_workflow_running",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
     "run_id": null,
@@ -398,10 +398,20 @@
     "paper_forward": "引擎 lag_stop=0；每日記錄份額法 NAV 對上線日持有的比值、比值高水位回撤、90/180/365 根滾動比值、策略絕對回撤；累積 ≥ 6 個月後以 cohort 分布再議 X；動作只能是通知/人工覆核"
   },
   "next_steps": [
-    "live/paper.py 現貨紙上前向（ema50_plain，BTC/USDT 與 ETH/USDT 現貨各 50%，上線日 2026-10-01，費 0.10%/邊、滑 0.05%，記錄型運行指標）",
-    "spot_data_source_check：用 Binance 現貨日線重跑 ema50_plain 十格，對永續版逐格 Δ",
-    "session_close_robustness：用 1h 合成不同收盤時點的日線檢查冠軍對時點的敏感度",
-    "guard_cohort_calibration_record_only：純量測，回答 X 要多大才是尾部事件",
-    "第 5 輪若要開：候選方向只剩上述量測型；策略型方向四輪 36 個變體已探完"
-  ]
+    "等 levers 工作流完成 → 讀 experiments/rounds/levers.md，整合 CLAUDE.md / dashboard，commit + push",
+    "使用者提供測試網金鑰後：executor init → run（maker-first 60）→ 加入 run_daily.bat",
+    "槓桿：不在真錢啟用；若要，只在紙上前向 ≥ 6 個月且持有風險層政策仍通過時討論"
+  ],
+  "levers": {
+    "workflow_run_id": "wf_dce40c49-2c7",
+    "script": "experiments/workflows/levers_round.js",
+    "note": "分析者在引擎修正前啟動（組合 vol_target 原本無作用、1× 會透支到 1.07）；以驗證者與 leverage_policy.py 的數字為準",
+    "leverage_policy": {
+      "script": "experiments/levers/leverage_policy.py",
+      "result": "results/levers/leverage_policy.md",
+      "finding": "槓桿只沿資本市場線移動：OOS Sharpe 全網格 1.03–1.18、1× 為 1.10；同風險層（回撤不深於 1× 2pp）兩個切分都驗證失敗；持有風險層兩切分都選 x2.0_vt0.9_ddl0.15，驗證通過（OOS CAGR 55.9% vs 37.9%、回撤 −54.5% vs −37.6%、Sharpe 1.10 = 1.10），鄰居 2/5 可行、零強平、最低保證金率 1.89；redeploy_idle 全面變差"
+    },
+    "executor": "live/executor.py（測試網；等使用者在 ABGT/.env 放 BINANCE_TESTNET_KEY/SECRET 後 init + 排程）",
+    "github": "https://github.com/feihong9487/abgt-quant-trading (private)"
+  }
 }
