@@ -163,6 +163,26 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 
 第 2 輪促成的引擎 v3：修正「收盤觸發停損 × 延遲成交」時出場排隊中會再排進場的 bug（重進規則改從成交根起算、`stop_events` 逐次紀錄）；`in_regime` dict 可帶 `scale` 陣列做分級曝險；`extra` 加 `exposure_key` / `fill_key` / `n_fills`，敏感度去重改看「regime 與曝險都相同」；`RiskParams.funding` 可放逐日歷史費率陣列，`data.fetch_funding()` 抓 Binance 費率歷史，壓力測試多一組「歷史資金費率」。
 
+### 優化迴圈 第 3 輪（2026-09-23，`experiments/rounds/round_3.md`）— 停止規則觸發
+
+28 個代理：5 方向 × 2 變體 → 10 個全部評估 → 3 個候選四道驗證 → 綜合。**無新冠軍（連續 3 輪），迴圈依規則停止。**
+
+| 變體 | 十格 | 六格平均 | OOS 最低 Δ | 驗證 | 一句話 |
+|------|------|---------|-----------|------|--------|
+| volume_confirmed_entry_q1_ema_exit | 10/10 | 1.19 | −0.023 | lookahead ✓ overfit ✗ executable ✗ holdout ✓ | 三輪最接近的候選；增量全在 IS 鞭打段，四 OOS |t| < 0.4；安慰劑：25% 隨機濾網同樣達標；換現貨量 7/80 個決策就翻 |
+| btc_leader_gate_ema50_and | 10/10 | 1.17 | −0.022 | ✓ ✗ ✗ ✓ | 三輪首個同時改善 SOL/BNB、ETH 回撤六格全淺；但 ETH 增量來自 IS 三個崩盤日，OOS 四種機制互抵 |
+| volume_confirmed_entry_q1_band_exit | 10/10 | 1.17 | −0.026 | ✓ ✗ ✗ ✓(踩線) | fastreentry 的鏡像，多餘回合 0/21 勝 |
+| slow_vol_scaled_band_atr50 / _median365 | 10/10 | 1.22 / 1.18 | −0.057 / −0.154 | holdout ✗ | 帶寬換慢尺度：ATR50 幾乎無操作；「V 型提早 2–5 根」假設不成立；證明通道 2023 後落後的是 +1 ATR 門檻本身 |
+| context_adaptive_entry_exit_cooldown / _whipsaw_count | 10/10、9/10 | 1.15 / 1.04 | −0.073 / −0.176 | — | 出場後 5 根內的再穿越 100% 負期望（BTC IS t 2.31），但 2023 後大回合都在假出場後 1–3 根 |
+| graded_exposure_dist_ratchet / _ema_ladder_mean | 10/10 | 1.12 / 1.14 | −0.065 / −0.07 | — | 鋸齒成本減半成立，但半倉日 IS +0.15 / OOS −0.18 正負翻轉；**消融 A3（分級 + 棘輪 + EMA50 出場）數值全達門檻、holdout SOL 5/5 BNB 3/5，未走驗證，是最值得續做的線索** |
+| btc_leader_gate_relstrength_ratio | 7/10 | 0.92 | — | — | 相對強度閘賣出仍在漲的相對弱勢幣；關閉 |
+
+三輪總結（32 個變體、81 個代理、約 2.2 小時工作流）：
+1. **`ema50_plain` 仍是冠軍。** 沒有任何疊加規則在 OOS 對它有統計上可分辨的改善；改善只出現在 2020–2022 的熊市反彈鞭打段，而那正是任何「讓進場變慢」的規則都能賺到的。
+2. **現行取代門檻沒有鑑別力**：第 3 輪安慰劑檢定顯示 25% 的隨機進場濾網也滿足「十格全過 + 六格平均 > 冠軍 + 四 OOS Δ ≥ −0.05」。若重開迴圈，門檻改為「四個 OOS 格對冠軍 ΔSharpe 平均 ≥ +0.05、至少一格 |t| ≥ 1.5、holdout 平均 Δ ≥ 0」。
+3. **有內容的發現**：不對稱遲滯（進場確認、出場不拖延）降回撤與換手（通道）；BTC 趨勢狀態對 ETH/SOL/BNB 的回撤有真實避險價值（btc_leader，尾部事件）；分級曝險把鋸齒成本減半（A3 線索）。這三條可以組合成下一階段的候選，但要走完整驗證。
+4. **永續執行不可行**（歷史資金費率下基準 ETH 全掛、BTC IS 掉閘）→ 現貨。
+
 取代冠軍的門檻（第 2 輪起）：十格 ≥ 9 且四個 OOS 格全過、六格平均 Sharpe 高於冠軍、四個 OOS 格對冠軍 ΔSharpe ≥ −0.05、OOS 敏感度通過率 ≥ 0.67、前視 / 過擬合（超額 Sharpe 口徑）/ holdout（SOL+BNB 十格 ≥ 5 過且平均 Δ ≥ −0.05）三道驗證全過。
 
 ### 結論（2026-09-23）
@@ -182,8 +202,10 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 - [x] 曝險型引擎 + 變體評估器 + 四個基準變體
 - [x] 多代理設計 / 對抗驗證迴圈 第 1 輪（`experiments/workflows/optimize_round.js`，狀態在 `experiments/rounds/loop_state.json`）
 - [x] 第 2 輪：崩盤閘、收盤確認停損、快速重進、相對下行波動預算、跨標的時間濾波 — 全部否定
-- [ ] 第 3 輪（最後一輪機會，連續 3 輪無新冠軍即停）：情境自適應進場門檻、BTC 領先閘（跨標的資訊）、慢波動尺度帶寬、量能確認進場、分級曝險（scale）
-- [x] 通道版正式化 `abgt/strategies/atr_channel.py`；冠軍（目前仍是 ema50_plain）的 Pine 版待做
+- [x] 第 3 輪：情境自適應、BTC 領先閘、慢波動帶寬、量能確認、分級曝險 — 無新冠軍，迴圈停止（`loop_state.json` status = stopped）
+- [ ] 若重開迴圈（需使用者指示）：先實作引擎 P1 `lag_stop` 運行閘門與 P2 `scale_mode=ratchet_up`，取代門檻改用 `loop_state.acceptance_rule_note`，起點 `candidate_directions_round_4`（A3 分級曝險正式化 + 驗證、熊市情境門檻、運行閘門、BTC/ETH 組合）
+- [x] 通道版正式化 `abgt/strategies/atr_channel.py`
+- [ ] ema50_plain 的 Pine 版（TradingView 目視 + 警報）
 - [x] 資金費率歷史資料接進 data.py；結論：永續執行成本讓基準 ETH 全掛、BTC IS 掉閘門，上線走現貨
 - [ ] 運行閘門 + Binance 測試網下單（`live/`）
 

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import os
 import sys
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -41,32 +40,29 @@ BTC_SYMBOL, TF, DATA_SINCE = "BTC/USDT:USDT", "1d", "2019-09-01"
 _DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
 
 
-# ---------- BTC 輔助（與規則 A 相同的兩個函式） ----------
+# ---------- BTC 輔助：與規則 A（btc_leader_gate_ema50_and.py）逐字相同的兩個函式 ----------
 
-@lru_cache(maxsize=1)
-def _load_btc() -> pd.DataFrame:
-    """讀 BTC 日線快取（與評估器同一份 CSV、同一個 DATA_SINCE），不連網；快取不存在直接報錯。"""
-    btc = dt.load_cached(_DATA_DIR, BTC_SYMBOL, TF, DATA_SINCE)
-    if btc is None:
-        raise FileNotFoundError(f"找不到 {BTC_SYMBOL} {TF} 快取：{dt.cache_path(_DATA_DIR, BTC_SYMBOL, TF)}（先跑 evaluate_variant --fetch）")
-    return btc
+def _load_btc():
+    # 評估器從專案根目錄跑（cache_dir="data"）；找不到時退回「變體檔往上兩層/data」，兩處都沒有就報錯
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in ("data", os.path.normpath(os.path.join(here, "..", "..", "data"))):
+        btc = dt.load_cached(d, BTC_SYMBOL, TF, DATA_SINCE)
+        if btc is not None:
+            return btc
+    raise FileNotFoundError("缺 BTC 日線快取 data/BTCUSDT_USDT_1d.csv")
 
 
-def _btc_view(df: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, bool]:
-    """回傳 (截到 ≤ df.index[-1] 的 BTC df, 對齊到 df.index 的 BTC close 陣列（缺值 NaN）, 是否就是 BTC 本身)。
-
-    - 截斷：BTC 只保留時間 ≤ df.index[-1] 的根，build(df.iloc[:T]) 看到的 BTC 與 build(df) 前 T 根完全一致（無前視）。
-    - 落後檢查：BTC 快取最後一根必須 ≥ df.index[-1]，否則尾端對齊值為 NaN 會被靜默當作 False → 直接報錯。
-    - is_btc：對齊後兩邊 close 在重疊區逐根相等（容忍浮點）即視為 BTC 本身（不靠符號名稱）。
-    """
-    btc_full = _load_btc()
-    if btc_full.index[-1] < df.index[-1]:
-        raise ValueError(f"BTC 快取落後：BTC 最後一根 {btc_full.index[-1]} < 標的最後一根 {df.index[-1]}，先補 BTC 快取")
-    btc = btc_full.loc[:df.index[-1]]
-    aligned = btc["close"].reindex(df.index).to_numpy(dtype="float64")
-    own = df["close"].to_numpy(dtype="float64")
-    overlap = ~np.isnan(aligned)
-    is_btc = bool(overlap.any() and np.allclose(own[overlap], aligned[overlap], rtol=1e-9, atol=0.0))
+def _btc_view(df):
+    """回傳 (btc 截到 ≤ df.index[-1], aligned_close, is_btc)。"""
+    btc = _load_btc()
+    btc = btc.loc[btc.index <= df.index[-1]]          # 截斷：build 內看不到 df 最後一根之後的任何 BTC 資料（前視截斷測試時 BTC 一起截斷）
+    if btc.index[-1] < df.index[-1]:
+        raise ValueError(f"BTC 快取落後：BTC 最後一根 {btc.index[-1].date()} < 標的最後一根 {df.index[-1].date()}，"
+                         f"先用 --variant ema50_plain --symbols BTC/USDT:USDT --fetch 補 BTC")
+    aligned = btc["close"].reindex(df.index).to_numpy("float64")   # df 有、BTC 沒有的日期 → NaN
+    c = df["close"].to_numpy("float64")
+    same = np.isclose(aligned, c, rtol=1e-9, atol=0.0)             # NaN → False
+    is_btc = bool(same.mean() >= 0.99)                             # df 本身就是 BTC（同一份快取，100% 相同；其他標的 ≈ 0%）
     return btc, aligned, is_btc
 
 

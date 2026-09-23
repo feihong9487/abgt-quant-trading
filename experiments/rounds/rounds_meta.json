@@ -27,12 +27,12 @@
     "round": 3,
     "run_id": "wf_5169138d-f58",
     "started": "2026-09-23T19:05+08:00",
-    "agents": null,
-    "duration_min": null,
+    "agents": 28,
+    "duration_min": 44,
     "variants": 10,
-    "verified": null,
+    "verified": 3,
     "champion": null,
-    "note": "進行中：情境自適應進場、BTC 領先閘、慢波動尺度帶寬、量能確認、分級曝險",
-    "report": null
+    "note": "三候選數值門檻達標但 overfit/executable 全 fail（增量全在 IS、OOS |t|<0.4、25% 隨機濾網也過門檻）；連續 3 輪無新冠軍，停止規則觸發",
+    "report": "experiments/rounds/round_3.md"
   }
 ]
