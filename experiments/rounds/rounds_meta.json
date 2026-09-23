@@ -39,12 +39,12 @@
     "round": 4,
     "run_id": "wf_935e3ba6-648",
     "started": "2026-09-23T20:46+08:00",
-    "agents": null,
-    "duration_min": null,
+    "agents": 19,
+    "duration_min": 50,
     "variants": 4,
-    "verified": null,
+    "verified": 3,
     "champion": null,
-    "note": "重開：分級曝險 A3 正式化 + 2×2 缺格、運行閘門（lag_stop hold/flat）；取代門檻改 Sharpe/風險雙路徑 + 安慰劑 P90",
-    "report": null
+    "note": "無新冠軍：A3 安慰劑第 83 百分位、clip 三道驗證 fail；hold 型運行閘門結構性否定（觸發時點是成本模型與起算日的函數）→ 紙上前向只跑 ema50_plain、閘門改記錄型",
+    "report": "experiments/rounds/round_4.md"
   }
 ]

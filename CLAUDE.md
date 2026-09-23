@@ -16,7 +16,7 @@ BGT（ETH 15 分）與 APEX（BTC 日線）的 Python 回測、買入持有基�
 |------|------|------|
 | 上線閘門（風險調整，現行） | Sharpe > 持有 **且** Calmar > 持有 **且** 最大回撤 < 持有；每個評估區間（IS / OOS / FULL）各自判定。季度表只當參考 | `abgt/benchmark.py gate(mode="risk")`，`--gate risk` |
 | 上線閘門（絕對，保留） | 全期淨報酬 > 持有且回撤更小且每季都過 | `--gate absolute`；對只做多不可達，見下 |
-| 運行閘門 | 實盤每日算策略淨值 vs 持有淨值，落後超過 X% 自動停止交易轉持有。最壞情況鎖在「持有 − X% − 手續費」 | 未做（要先有過上線閘門的策略） |
+| 運行閘門 | 原設計：落後 X% 自動轉持有/空手。**第 4 輪否定 hold/flat 型自動閘門**：觸發時點是成本模型與起算日的函數（五個壓力情境五套觸發集合、成交價 σ=0.05% 雜訊 20 種子 13 種觸發集合）、累計落後 20% 在牛市是趨勢跟隨的正常區間（14 個季度上線日 BTC 9 / ETH 11 觸發）、hold 在頂部觸發等於關掉唯一的風控（BTC 2021-11→2022-05 −50% vs plain −30%）、恢復重設基期讓「鎖定」變成 0.8^k 向下棘輪。**現行：只記錄不動作** — 引擎 `lag_action="record"`、`lag_base_mode="hwm"`；紙上前向每日記錄比值高水位回撤與滾動比值，累積 ≥ 6 個月後以 cohort 分布再議 X，動作只能是通知 / 人工覆核 | `regime.py` 引擎 v4；`live/paper.py` |
 
 **季度閘門的結構性問題**（2026-09-23 發現）：在 ETH/BTC 單季漲 50–70% 的季度，任何不是 >100% 做多的策略都不可能「報酬更高且回撤更小」。所以「每季都過」對只做多趨勢策略等於不可能，見第 5 節四種曝險型變體最多也只過 6/15 季。要有意義的閘門是全期版本或風險調整版本（Sharpe / Calmar 高於持有）。
 
@@ -27,8 +27,12 @@ ABGT/
 ├── run_backtest.py          入口：--strategy bgt|apex [--mode kf|multi] [--require-kf-dir] [--offline] [--since] [--gate risk|absolute]
 ├── evaluate_variant.py      曝險型變體評估：--variant <name> [--symbols ...] [--alt-split] [--sensitivity --sens-factors 0.5,0.75,1.25,1.5] [--baseline <id>] [--stress]
 ├── experiments/variants/    變體檔（PARAMS + build(df, params) → in_regime 或 {enter, exit}, RiskParams, warmup）
+├── evaluate_portfolio.py    雙標的組合評估：--variant / --variants、--weights、對「持有不再平衡」與「持有月再平衡」兩種基準、--stress、組合層 --lag-stop
+├── build_dashboard.py       產生 dashboard/index.html 與 status.json（即時狀態寫進 artifact 資料庫 status/current）
+├── live/paper.py            現貨紙上前向：init / run / report / selftest；live/README.md 有事前登記與排程指令
+├── pine/ema50_plain.pine    冠軍的 TradingView 版（目視 + 警報 + 相對持有落後面板）
 ├── experiments/workflows/   optimize_round.js：每輪的多代理工作流腳本（設計 → 實作評估 → 四道驗證 → 綜合）
-├── experiments/rounds/      round_N.md 回合報告、loop_state.json 迴圈狀態（中斷後先讀這個）
+├── experiments/rounds/      round_N.md 回合報告、loop_state.json 迴圈狀態（中斷後先讀這個）、rounds_meta.json
 ├── abgt/
 │   ├── data.py              ccxt 抓 Binance USDT-M K 線，CSV 快取，之後只補新資料
 │   ├── indicators.py        對應 Pine ta.*：ema/rma（SMA 起算）、atr、rsi、macd、dmi、supertrend_pine、pivot、HTF 對齊
@@ -38,7 +42,8 @@ ABGT/
 │   └── strategies/
 │       ├── bgt.py           BGT V5.1.3 信號 + 模擬器（process_orders_on_close=true 語意）
 │       ├── apex.py          APEX v4.0 只做多 信號 + 模擬器（下一根開盤成交、雙腿 exit、追蹤止損、熔斷）
-│       ├── regime.py        曝險型引擎 v2：in_regime 或 {enter, exit} + RiskParams（曝險上限、絕對/相對/下行波動目標、吊燈停損 low/close 觸發、重進規則、回撤暫停與恢復、資金費率、執行延遲、調倉門檻）
+│   ├── portfolio.py         雙標的組合引擎：共用權益、每標的權重 × regime × scale、組合層 dd_pause / lag_stop、同權重持有基準（不再平衡 / 月再平衡）
+│       ├── regime.py        曝險型引擎 v4：in_regime 或 {enter, exit, scale} + RiskParams（曝險上限、分級曝險 track/ratchet_up + floor、絕對/相對/下行波動目標、吊燈停損 low/close 觸發、重進規則、回撤暫停與恢復、運行閘門 hold/flat/record、資金費率、執行延遲、調倉門檻）
 │       └── atr_channel.py   正式策略：EMA50 ± ATR 不對稱通道（第 1 輪最佳變體，BTC 回撤較小的替代品）
 ├── experiments/regime.py    對照：趨勢內 100% 持倉 / 趨勢外空手
 ├── tests/test_smoke.py      python tests/test_smoke.py（不需 pytest）
@@ -183,6 +188,39 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 3. **有內容的發現**：不對稱遲滯（進場確認、出場不拖延）降回撤與換手（通道）；BTC 趨勢狀態對 ETH/SOL/BNB 的回撤有真實避險價值（btc_leader，尾部事件）；分級曝險把鋸齒成本減半（A3 線索）。這三條可以組合成下一階段的候選，但要走完整驗證。
 4. **永續執行不可行**（歷史資金費率下基準 ETH 全掛、BTC IS 掉閘）→ 現貨。
 
+### 優化迴圈 第 4 輪（2026-09-23，`experiments/rounds/round_4.md`）— 使用者指示重開：a 分級曝險 + b 運行閘門
+
+19 個代理：2 方向 × 2 變體 → 4 個全部評估 → 3 個四道驗證 → 綜合。**無新冠軍；graded_exposure 與 hold 型運行閘門兩個方向都依事前判準關閉。**
+
+| 變體 | 類型 | 十格 | 六格平均 | 四 OOS Δ 平均 | 驗證 | 一句話 |
+|------|------|------|---------|--------------|------|--------|
+| graded_exposure_ema_exit_ratchet_a3 | strategy | 10/10 | 1.148 | +0.012 | 安慰劑 fail | 第 3 輪 A3 數字逐位重現、holdout 兩標的不劣，但把「哪個回合拿到哪條升階路徑」隨機置換 150 次它只在第 83 百分位，10.7% 隨機路徑滿足全部門檻；bars_to_full 中位數 2 根 = 分級實際是「進場後 1–2 根要嘛滿倉要嘛整回合半倉」 |
+| graded_exposure_ema_exit_clip_d05 | strategy | 9/10 | 1.109 | +0.071（t 1.85） | lookahead ✓ overfit ✗ executable ✗ holdout ✗ | BTC OOS +0.135/+0.176 是四輪最強的 BTC 證據，但假設來自同一段 2024–26 資料、ETH 機制反向（半倉根次日反而漲）、ETH IS2 掛、BNB 五格全負；62% 的減半只持續 1 根 = EMA50+0.5 ATR 軟出場帶的變形 |
+| running_gate_lag_stop_cum20_hold60 | guard | 4/10 | 0.95 | — | ✓ ✗ ✗ ✗ | 十格翻掛 6 格，最深相對落後 −61.6% → −76.3%；11 筆觸發 6 筆在翻多日（策略空手、進場已排隊）→ 等於「重進後 60 根禁止出場」 |
+| running_gate_lag_stop_roll180_20_hold60 | guard | 5/10 | 0.84 | — | ✓ ✗ ✗ ✗ | 頂部觸發抱住整段第一波熊市；觸發集合隨成本模型 / 起算日 / 成交價雜訊變動；安慰劑（同長度隨機放置的 hold）在兩標的都優於實際時點 |
+
+### c：BTC/ETH 50/50 組合（`abgt/portfolio.py`、`evaluate_portfolio.py`，2026-09-23）
+
+| 區間 | 組合 Sharpe | 單標的平均 | 50/50 持有不再平衡 | 50/50 持有月再平衡 | 組合回撤 / 持有回撤 |
+|------|------------|-----------|------------------|------------------|-------------------|
+| IS | 1.24 | 1.14 | 1.04 | 1.02 | −59% / −78% |
+| OOS | 1.13 | 1.06 | 0.79 | 0.93 | −39% / −62% |
+| FULL | 1.17 | 1.08 | 0.90 | 0.96 | −59% / −78% |
+| IS2 | 1.39 | 1.27 | 1.15 | 1.19 | |
+| OOS2 | 0.77 | 0.71 | 0.49 | 0.58 | |
+
+十格對兩種基準全過；組合 Sharpe 五個區間都高於單標的平均（分散紅利 +0.06～+0.12），ETH 的薄邊距被 BTC 吸收。壓力：費 / 滑 / 常數資金費率 / 延遲全過，歷史資金費率翻 IS、IS2 → 現貨。通道版組合 FULL 1.29、回撤 −46%、換手 9.9×/年（ema50_plain 24.3×）。組合層 lag_stop 0.20 hold 的探索是反例（2021-05、2022-02 觸發抱住熊市，回撤 −80%）。
+
+### 現貨資料來源檢查（2026-09-23）
+
+用 Binance 現貨日線重跑 ema50_plain：BTC 十格全過，Sharpe 1.03 / 1.39 / 1.18 / 1.31 / 0.97（永續 1.01 / 1.40 / 1.17 / 1.32 / 0.97）；ETH 十格全過，1.32 / 0.76 / 1.05 / 1.25 / 0.51（永續略低）。策略搬到現貨成立。現貨真實成本（費 0.10% + 滑 0.20%）下 ETH 五格全掛、BTC 全過 — ETH 對持有的邊距薄，是紙上前向要盯的點。
+
+### 現貨紙上前向（`live/paper.py`，上線日 2026-10-01）
+
+ema50_plain、BTC/USDT 與 ETH/USDT 現貨各 50%、費 0.10%/邊、滑 0.05%、00:00 UTC 收盤決策次日開盤成交；帳本用 2026-06-01→09-22 自我驗證與 `simulate_portfolio` 逐位一致（114 日、14 筆成交、NAV 差 0.00000%）。運行指標只記錄。事前登記的評估視窗、可證偽預測與停止條件在 `live/README.md`。
+
+四輪總結（36 個變體、100 個代理）：**`ema50_plain` 是冠軍，且沒有任何疊加規則在 OOS 對它有可分辨的改善。** 兩條有內容的線索（不對稱遲滯降回撤換手、BTC 領先閘的尾部避險）都不足以取代。優化到此為止，資源轉到前向。
+
 取代冠軍的門檻（第 2 輪起）：十格 ≥ 9 且四個 OOS 格全過、六格平均 Sharpe 高於冠軍、四個 OOS 格對冠軍 ΔSharpe ≥ −0.05、OOS 敏感度通過率 ≥ 0.67、前視 / 過擬合（超額 Sharpe 口徑）/ holdout（SOL+BNB 十格 ≥ 5 過且平均 Δ ≥ −0.05）三道驗證全過。
 
 ### 結論（2026-09-23）
@@ -203,9 +241,12 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 - [x] 多代理設計 / 對抗驗證迴圈 第 1 輪（`experiments/workflows/optimize_round.js`，狀態在 `experiments/rounds/loop_state.json`）
 - [x] 第 2 輪：崩盤閘、收盤確認停損、快速重進、相對下行波動預算、跨標的時間濾波 — 全部否定
 - [x] 第 3 輪：情境自適應、BTC 領先閘、慢波動帶寬、量能確認、分級曝險 — 無新冠軍，迴圈停止（`loop_state.json` status = stopped）
-- [ ] 若重開迴圈（需使用者指示）：先實作引擎 P1 `lag_stop` 運行閘門與 P2 `scale_mode=ratchet_up`，取代門檻改用 `loop_state.acceptance_rule_note`，起點 `candidate_directions_round_4`（A3 分級曝險正式化 + 驗證、熊市情境門檻、運行閘門、BTC/ETH 組合）
-- [x] 通道版正式化 `abgt/strategies/atr_channel.py`
-- [ ] ema50_plain 的 Pine 版（TradingView 目視 + 警報）
+- [x] 第 4 輪（使用者指示重開）：A3 分級曝險正式化 + 2×2 缺格、hold 型運行閘門 — 兩方向關閉；引擎 v4（lag_stop 記錄型、ratchet_up、帳目輸出）
+- [x] c：BTC/ETH 50/50 組合引擎與評估（十格全過、Sharpe 高於單標的平均）
+- [x] 通道版正式化 `abgt/strategies/atr_channel.py`；ema50_plain Pine 版 `pine/ema50_plain.pine`
+- [x] 現貨資料來源檢查；`live/paper.py` 紙上前向（上線 2026-10-01，需排程每日 00:05 UTC 執行）
+- [ ] 前向累積 ≥ 6 個月後：guard_cohort_calibration（純量測）決定 X 是否存在；session_close_robustness（1h 合成不同收盤時點）
+- [ ] 第 5 輪（若開）：策略型方向四輪 36 個變體已探完，只剩量測型；不建議
 - [x] 資金費率歷史資料接進 data.py；結論：永續執行成本讓基準 ETH 全掛、BTC IS 掉閘門，上線走現貨
 - [ ] 運行閘門 + Binance 測試網下單（`live/`）
 

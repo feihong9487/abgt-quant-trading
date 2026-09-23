@@ -1,11 +1,11 @@
 {
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
-  "updated": "2026-09-23T20:45+08:00",
+  "updated": "2026-09-23T21:20+08:00",
   "round": 4,
-  "status": "round_4_workflow_running",
+  "status": "round_4_done_paper_forward_next",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
-    "run_id": "wf_935e3ba6-648",
+    "run_id": null,
     "previous_runs": [
       {
         "round": 1,
@@ -24,6 +24,12 @@
         "run_id": "wf_5169138d-f58",
         "report": "experiments/rounds/round_3.md",
         "champion": "無"
+      },
+      {
+        "round": 4,
+        "run_id": "wf_935e3ba6-648",
+        "report": "experiments/rounds/round_4.md",
+        "champion": "無；graded_exposure 與 hold 型運行閘門方向關閉"
       }
     ],
     "resume_hint": "Workflow({scriptPath, resumeFromRunId: run_id, args}) 會沿用已完成代理的快取結果；先讀 transcript dir 的 journal.jsonl"
@@ -231,9 +237,25 @@
     {
       "id": "graded_exposure_ema_ladder_mean",
       "note": "EMA 35/50/70 三級曝險；BTC ema_len 敏感度帶寬壓到 0.15–0.31×，ETH 反放大；成交 2.1× 讓高費情境翻掉"
+    },
+    {
+      "id": "graded_exposure_ema_exit_ratchet_a3",
+      "note": "A3 正式化（進場 0.5、+0.5 ATR 0.75、+1 ATR 1.0、棘輪、EMA50 出場）；十格全過、holdout 兩標的不劣，但安慰劑 150 次回合路徑置換把它放在第 83/69 百分位、10.7% 隨機路徑滿足全部門檻；方向關閉"
+    },
+    {
+      "id": "graded_exposure_ema_exit_clip_d05",
+      "note": "二元進場 + d<0.5 降半倉 + EMA50 出場；BTC OOS Δ +0.135/+0.176 t 1.7–1.9 是四輪最強 BTC 證據，但假設來自同一段資料、ETH 機制反向（半倉根次日反而漲）、ETH IS2 掛、BNB 五格全負；三道驗證 fail"
+    },
+    {
+      "id": "running_gate_lag_stop_cum20_hold60",
+      "note": "累計落後 20% → hold 60 根；十格翻掛 6 格，最深相對落後 -61.6% → -76.3%（恢復重設基期 = 0.8^k 向下棘輪）；11 筆觸發 6 筆在翻多日；關閉"
+    },
+    {
+      "id": "running_gate_lag_stop_roll180_20_hold60",
+      "note": "滾動 180 根落後 20% → hold 60 根；頂部觸發抱住整段熊市（BTC 2021-11→2022-05 -50%）、觸發集合隨成本模型/起算日/成交價雜訊變動；關閉"
     }
   ],
-  "rounds_without_champion": 0,
+  "rounds_without_champion": 1,
   "stop_rule": "第 4 輪起重新計數：連續 3 輪沒有新 champion 就停止並回報（使用者 2026-09-23 指示重開：a 分級曝險 A3 正式化 + b 運行閘門，之後跑 c 組合）",
   "directions_round_3": [
     {
@@ -272,10 +294,7 @@
     "7. python build_dashboard.py 重建 dashboard/index.html 並用 Artifact 工具重新發佈到同一個 URL"
   ],
   "resume_after_interruption": [
-    "若 status 是 *_workflow_running：先用 resumeFromRunId 續跑工作流，不要重開新的",
-    "若 status 是 *_pending_launch：用 Workflow({scriptPath, args:{round, baseline, ledger, directions: directions_round_4, accept}}) 啟動",
-    "若 status 是 integrating：檢查 git status，把未完成的步驟做完",
-    "第 4 輪後：做 c（引擎 P4 simulate_portfolio + BTC/ETH 50/50），然後 live/ 現貨紙上前向測試"
+    "迴圈已完成使用者指定的 a+b（第 4 輪）與 c（組合）；下一步是紙上前向，不自動開第 5 輪，需使用者指示"
   ],
   "candidate_directions_round_4": [
     {
@@ -371,6 +390,18 @@
     "portfolio_lag_guard_explore": {
       "params": "lag_stop 0.2 累計 hold ratio_high 60",
       "result": "反例：2021-05-05、2022-02-07 觸發轉持有抱住整段熊市，回撤 -80%、IS/FULL/IS2 掛；hold 動作在熊市 = 買在半山腰"
-    }
-  }
+    },
+    "conclusion": "BTC/ETH 50/50 ema50_plain 組合十格對兩種持有基準全過、Sharpe 五區間都高於單標的平均；紙上前向可用組合口徑（單標的帳各自記）"
+  },
+  "guard_decision": {
+    "verdict": "不採用 hold/flat 型自動運行閘門",
+    "paper_forward": "引擎 lag_stop=0；每日記錄份額法 NAV 對上線日持有的比值、比值高水位回撤、90/180/365 根滾動比值、策略絕對回撤；累積 ≥ 6 個月後以 cohort 分布再議 X；動作只能是通知/人工覆核"
+  },
+  "next_steps": [
+    "live/paper.py 現貨紙上前向（ema50_plain，BTC/USDT 與 ETH/USDT 現貨各 50%，上線日 2026-10-01，費 0.10%/邊、滑 0.05%，記錄型運行指標）",
+    "spot_data_source_check：用 Binance 現貨日線重跑 ema50_plain 十格，對永續版逐格 Δ",
+    "session_close_robustness：用 1h 合成不同收盤時點的日線檢查冠軍對時點的敏感度",
+    "guard_cohort_calibration_record_only：純量測，回答 X 要多大才是尾部事件",
+    "第 5 輪若要開：候選方向只剩上述量測型；策略型方向四輪 36 個變體已探完"
+  ]
 }

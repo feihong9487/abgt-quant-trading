@@ -1,0 +1,35 @@
+{
+  "created": "2026-09-23T13:05:22+00:00",
+  "config": {
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT"
+    ],
+    "weights": {
+      "BTC/USDT": 0.5,
+      "ETH/USDT": 0.5
+    },
+    "capital": 10000.0,
+    "fee": 0.001,
+    "slip": 0.0005,
+    "ema_len": 50,
+    "rebalance_threshold": 0.15,
+    "strategy": "ema50_plain",
+    "exchange": "binance spot",
+    "start": "2026-10-01",
+    "note": "收盤決策、次日開盤成交；運行閘門只記錄不動作（第 4 輪結論）"
+  },
+  "cash": 10000.0,
+  "positions": {
+    "BTC/USDT": 0.0,
+    "ETH/USDT": 0.0
+  },
+  "pending": {},
+  "bh_qty": {},
+  "started": false,
+  "last_processed": null,
+  "history": [],
+  "fills": [],
+  "ratio_hwm": 1.0,
+  "nav_hwm": 10000.0
+}

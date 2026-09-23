@@ -60,9 +60,11 @@ class RiskParams:
     dd_resume_bars: int = 20
     lag_stop: float = 0.0
     lag_window: int = 0
-    lag_action: str = "hold"              # hold | flat
+    lag_action: str = "hold"              # hold | flat | record（只記錄，不改目標曝險）
+    lag_base_mode: str = "reset"          # reset（起算根 / 上次恢復根）| hwm（對比值高水位量測，恢復不重設）| start_only（永遠對起算根）
     lag_resume: str = "regime_reset"      # regime_reset | bars | ratio_high
     lag_resume_bars: int = 60
+    lag_retrigger_cooldown: int = 0       # 恢復後 N 根內不得再觸發
     funding_rate_8h: float = 0.0
     funding: np.ndarray | None = field(default=None, repr=False, compare=False)
     exec_delay_bars: int = 0
@@ -203,7 +205,10 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
     scale_ups = scale_downs = 0
     lag_mode = False
     lag_bar = -10 ** 9
+    lag_resume_at = -10 ** 9
     lag_base = 1.0
+    ratio_hwm = 1.0
+    lag_min_margin = np.inf
     lag_events: list[dict] = []
     n_stop = n_pause = n_entries = n_exits = 0
     funding_paid = 0.0
@@ -334,25 +339,33 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
             pause_bar = i
             n_pause += 1
         # 運行閘門：相對持有落後
+        ratio_hwm = max(ratio_hwm, ratio)
         if rp.lag_stop > 0:
             if lag_mode:
+                resumed = False
                 if rp.lag_resume == "bars" and i - lag_bar >= rp.lag_resume_bars:
-                    lag_mode, lag_base = False, ratio
-                    lag_events[-1]["resume_bar"] = i
+                    resumed = True
                 elif rp.lag_resume == "ratio_high" and i - lag_bar >= 1:
                     win = ratio_hist[max(start_idx, i - rp.lag_resume_bars):i]
-                    if len(win) and ratio >= np.nanmax(win):
-                        lag_mode, lag_base = False, ratio
-                        lag_events[-1]["resume_bar"] = i
+                    resumed = bool(len(win) and ratio >= np.nanmax(win))
+                if resumed:
+                    lag_mode = False
+                    lag_resume_at = i
+                    if rp.lag_base_mode == "reset":
+                        lag_base = ratio
+                    lag_events[-1]["resume_bar"] = i
             else:
                 if rp.lag_window > 0:
                     j = i - rp.lag_window
                     lag = ratio / ratio_hist[j] - 1 if j >= start_idx and ratio_hist[j] == ratio_hist[j] and ratio_hist[j] > 0 else 0.0
+                elif rp.lag_base_mode == "hwm":
+                    lag = ratio / ratio_hwm - 1
                 else:
                     lag = ratio / lag_base - 1
-                if lag <= -rp.lag_stop:
+                lag_min_margin = min(lag_min_margin, lag + rp.lag_stop)
+                if lag <= -rp.lag_stop and i - lag_resume_at >= rp.lag_retrigger_cooldown:
                     lag_mode, lag_bar = True, i
-                    lag_events.append({"trigger_bar": i, "lag": float(lag), "resume_bar": None, "action": rp.lag_action})
+                    lag_events.append({"trigger_bar": i, "time": str(idx[i].date()), "lag": float(lag), "ratio": float(ratio), "resume_bar": None, "action": rp.lag_action})
         exiting = any(p[1] == 0.0 for p in pending)
         if mode == "wait_price" and on and not np.isnan(stop_exit_px) and c[i] > stop_exit_px:
             mode = "armed"
@@ -377,7 +390,7 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                 else:
                     factor = min(1.0, rp.vol_target / rvol[i] / rp.max_exposure)
                 target *= factor
-        if lag_mode and not stop_hit_close:
+        if lag_mode and not stop_hit_close and rp.lag_action != "record":
             target = rp.max_exposure if rp.lag_action == "hold" else 0.0
         current = pos * c[i] / eqv if eqv > 0 else 0.0
         # 已排隊但還沒成交的目標視為「即將達成」，避免延遲成交時重複排同一個目標
@@ -390,10 +403,12 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
             stop = np.nan
             mode = "wait_fill"
         elif target == 0 and ref > 0:
-            reason = "回撤暫停" if paused else ("落後閘門" if lag_mode else ("曝險歸零" if on else "趨勢結束"))
+            acting = lag_mode and rp.lag_action != "record"
+            reason = "回撤暫停" if paused else ("落後閘門" if acting else ("曝險歸零" if on else "趨勢結束"))
             pending.append((fill_bar(i), 0.0, reason))
         elif target > 0 and ref == 0:
-            pending.append((fill_bar(i), target, "落後閘門持有" if (lag_mode and not on) else "進場"))
+            acting = lag_mode and rp.lag_action != "record"
+            pending.append((fill_bar(i), target, "落後閘門持有" if (acting and not on) else "進場"))
         elif target > 0 and ref > 0 and abs(target - ref) > rp.rebalance_threshold:
             pending.append((fill_bar(i), target, "調整曝險"))
         eq[i] = eqv
@@ -419,6 +434,7 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
         "partial_days": int(np.sum((ex > 0) & (ex < rp.max_exposure * 0.99))),
         "scale_ups": scale_ups, "scale_downs": scale_downs,
         "lag_triggers": len(lag_events), "lag_events": lag_events,
+        "lag_min_margin": float(lag_min_margin) if lag_min_margin != np.inf else None,
         "lag_bars": int(sum(((e["resume_bar"] if e["resume_bar"] is not None else n - 1) - e["trigger_bar"]) for e in lag_events)),
         "rel_dd_vs_hold": rel_dd, "rel_final_vs_hold": float(ratio_s[-1] - 1) if len(ratio_s) else 0.0,
         "rel_log_vs_hold": rel_log, "bench_equity": bench[start_idx:],
