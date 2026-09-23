@@ -1,0 +1,36 @@
+{
+  "round": 3,
+  "status": "round_3_workflow_running",
+  "rounds_without_champion": 2,
+  "baseline_id": "ema50_plain",
+  "run_id": "wf_5169138d-f58",
+  "variants_planned": 10,
+  "phase_totals": {
+    "design": 5,
+    "impl": 10,
+    "synthesize": 1
+  },
+  "phase_counts": {
+    "design": 5,
+    "impl": 0,
+    "verify": 0,
+    "synthesize": 0
+  },
+  "agents_done": 5,
+  "agents_total": null,
+  "running": [
+    "impl:btc_leader_gate_ema50_and",
+    "impl:btc_leader_gate_relstrength_ratio",
+    "impl:slow_vol_scaled_band_median365",
+    "impl:slow_vol_scaled_band_atr50",
+    "impl:volume_confirmed_entry_q1_ema_exit",
+    "impl:volume_confirmed_entry_q1_band_exit",
+    "impl:context_adaptive_entry_whipsaw_count",
+    "impl:context_adaptive_entry_exit_cooldown",
+    "impl:graded_exposure_dist_ratchet",
+    "impl:graded_exposure_ema_ladder_mean"
+  ],
+  "started": "2026-09-23T19:11+08:00",
+  "message": "第 3 輪進行中：情境自適應進場、BTC 領先閘、慢波動帶寬、量能確認、分級曝險",
+  "updated_at": "2026-09-23T19:24:29+08:00"
+}

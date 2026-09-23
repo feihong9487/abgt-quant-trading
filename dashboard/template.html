@@ -1,162 +1,214 @@
-<title>ABGT 優化儀表板</title>
+<title>ABGT Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
-  color-scheme:light;
-  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
-  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,0.10);
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --bh:#898781;
-  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b; --good-text:#006300;
-  --good-wash:rgba(12,163,12,0.12); --crit-wash:rgba(208,59,59,0.12); --warn-wash:rgba(250,178,25,0.16);
-  --accent:#2a78d6; --accent-wash:rgba(42,120,214,0.10);
-  --is-wash:rgba(42,120,214,0.06); --oos-wash:rgba(235,104,52,0.07);
+  color-scheme:dark;
+  --bg:#09090b; --bg-2:#0f0f12; --panel:#121216; --panel-2:#17171c; --line:#26262d; --line-2:#33333b;
+  --ink:#fafafa; --ink-2:#c7c7cf; --ink-3:#8b8b97; --ink-4:#5f5f6b;
+  --primary:#0C5CAB; --accent:#3987e5; --accent-2:#5aa0f0; --accent-wash:rgba(57,135,229,0.14); --accent-ring:rgba(57,135,229,0.45);
+  --s1:#3987e5; --s2:#d95926; --bh:#a9a79e;
+  --good:#10b981; --warn:#f59e0b; --bad:#ef4444;
+  --good-wash:rgba(16,185,129,0.16); --warn-wash:rgba(245,158,11,0.16); --bad-wash:rgba(239,68,68,0.16);
+  --is-wash:rgba(57,135,229,0.09); --oos-wash:rgba(217,89,38,0.10);
+  --glass:linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.012));
+  --shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --r:12px; --r-in:8px;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    color-scheme:dark;
-    --plane:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --bh:#a9a79e;
-    --good-text:#0ca30c; --accent:#3987e5; --accent-wash:rgba(57,135,229,0.16);
-    --good-wash:rgba(12,163,12,0.20); --crit-wash:rgba(208,59,59,0.22); --warn-wash:rgba(250,178,25,0.22);
-    --is-wash:rgba(57,135,229,0.10); --oos-wash:rgba(217,89,38,0.12);
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#f4f4f6; --bg-2:#ececf0; --panel:#ffffff; --panel-2:#f7f7fa; --line:#e2e2e8; --line-2:#d2d2da;
+    --ink:#101014; --ink-2:#3a3a44; --ink-3:#6b6b78; --ink-4:#9a9aa6;
+    --accent:#0C5CAB; --accent-2:#2a78d6; --accent-wash:rgba(12,92,171,0.10); --accent-ring:rgba(12,92,171,0.40);
+    --s1:#2a78d6; --s2:#eb6834; --bh:#7a7873;
+    --good:#0f9d6d; --warn:#c77c07; --bad:#d63a3a;
+    --good-wash:rgba(16,185,129,0.14); --warn-wash:rgba(245,158,11,0.16); --bad-wash:rgba(239,68,68,0.12);
+    --is-wash:rgba(42,120,214,0.07); --oos-wash:rgba(235,104,52,0.08);
+    --glass:linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,255,255,0.6));
+    --shadow:0 1px 2px rgba(16,16,20,0.06), 0 8px 24px rgba(16,16,20,0.06);
   }
 }
-:root[data-theme="dark"]{
-  color-scheme:dark;
-  --plane:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
-  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --bh:#a9a79e;
-  --good-text:#0ca30c; --accent:#3987e5; --accent-wash:rgba(57,135,229,0.16);
-  --good-wash:rgba(12,163,12,0.20); --crit-wash:rgba(208,59,59,0.22); --warn-wash:rgba(250,178,25,0.22);
-  --is-wash:rgba(57,135,229,0.10); --oos-wash:rgba(217,89,38,0.12);
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f4f4f6; --bg-2:#ececf0; --panel:#ffffff; --panel-2:#f7f7fa; --line:#e2e2e8; --line-2:#d2d2da;
+  --ink:#101014; --ink-2:#3a3a44; --ink-3:#6b6b78; --ink-4:#9a9aa6;
+  --accent:#0C5CAB; --accent-2:#2a78d6; --accent-wash:rgba(12,92,171,0.10); --accent-ring:rgba(12,92,171,0.40);
+  --s1:#2a78d6; --s2:#eb6834; --bh:#7a7873;
+  --good:#0f9d6d; --warn:#c77c07; --bad:#d63a3a;
+  --good-wash:rgba(16,185,129,0.14); --warn-wash:rgba(245,158,11,0.16); --bad-wash:rgba(239,68,68,0.12);
+  --is-wash:rgba(42,120,214,0.07); --oos-wash:rgba(235,104,52,0.08);
+  --glass:linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,255,255,0.6));
+  --shadow:0 1px 2px rgba(16,16,20,0.06), 0 8px 24px rgba(16,16,20,0.06);
 }
 *{box-sizing:border-box}
-body{background:var(--plane);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:14px;line-height:1.5;padding-block:20px 48px;padding-inline:20px;max-width:1280px;margin:0 auto}
-h1{font-size:22px;margin:0;letter-spacing:-0.01em}
-h2{font-size:15px;margin:0 0 10px;font-weight:600}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;margin:0;padding-block:0 56px;padding-inline:0}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:20px}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-0.01em}
+h2{font-size:14px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 p{margin:0}
-.sub{color:var(--ink-2)}
-.mono,.num,td.num,th.num{font-variant-numeric:tabular-nums}
-.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+.muted{color:var(--ink-3)}
+a{color:var(--accent-2)}
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;min-height:56px;flex-wrap:wrap;padding-block:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mark{width:28px;height:28px;border-radius:7px;background:var(--primary);display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:600;font-size:12px}
+.brand h1{font-size:16px}
+.brand .sub{font-size:12px;color:var(--ink-3)}
+.live{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:12px;color:var(--ink-2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink-4);box-shadow:0 0 0 0 transparent}
+.dot.on{background:var(--good);animation:pulse 2s ease-out infinite}
+.dot.wait{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--line-2);background:var(--panel);font-size:12px;color:var(--ink-2);white-space:nowrap}
+.chip.acc{border-color:transparent;background:var(--accent-wash);color:var(--accent-2);font-weight:500}
+.chip.good{border-color:transparent;background:var(--good-wash);color:var(--good)}
+.chip.warn{border-color:transparent;background:var(--warn-wash);color:var(--warn)}
+.chip.bad{border-color:transparent;background:var(--bad-wash);color:var(--bad)}
+.chip b{font-family:var(--mono);font-weight:600}
+/* layout */
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:1.2fr 1fr 1fr}
+.g6{grid-template-columns:repeat(6,1fr)}
+.g2{grid-template-columns:1fr 1fr}
+@media (max-width:1000px){.g3{grid-template-columns:1fr 1fr}.g6{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:640px){.g3,.g2,.g6{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr}}
 section{margin-top:22px}
-.card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px 16px}
-.grid{display:grid;gap:12px}
-.grid.status{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.grid.kpi{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.stat .label{color:var(--ink-2);font-size:12px}
-.stat .value{font-size:26px;font-weight:600;line-height:1.15;margin-top:2px}
-.stat .value small{font-size:13px;font-weight:500;color:var(--ink-2);margin-left:4px}
-.stat .cmp{font-size:12px;color:var(--muted);margin-top:4px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ring);background:var(--surface)}
-.pill.good{background:var(--good-wash);color:var(--good-text)}
-.pill.crit{background:var(--crit-wash);color:var(--crit)}
-.pill.warn{background:var(--warn-wash);color:var(--ink)}
-.pill.run{background:var(--accent-wash);color:var(--accent)}
-.strike{display:flex;gap:6px;margin-top:8px}
-.strike span{flex:1;height:8px;border-radius:4px;background:var(--grid)}
-.strike span.hit{background:var(--crit)}
-.rounds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.round{border-left:3px solid var(--grid);padding:6px 0 6px 12px}
-.round.done{border-left-color:var(--muted)}
-.round.run{border-left-color:var(--accent)}
-.round .t{font-weight:600}
-.round .m{color:var(--ink-2);font-size:12px;margin-top:2px}
-.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-.seg{display:inline-flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden}
-.seg button{border:0;background:transparent;color:var(--ink-2);padding:6px 12px;font:inherit;cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--accent-wash);color:var(--accent);font-weight:600}
-.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.panel{background:var(--panel);background-image:var(--glass);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px}
+.panel.tight{padding:12px 14px}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+/* loop state panel */
+.big{font-family:var(--mono);font-size:44px;font-weight:600;line-height:1;letter-spacing:-0.02em}
+.big small{font-size:16px;color:var(--ink-3);font-weight:500;margin-left:6px;font-family:var(--sans)}
+.strikes{display:flex;gap:6px;margin:10px 0 4px}
+.strikes span{flex:1;height:6px;border-radius:3px;background:var(--line-2)}
+.strikes span.hit{background:var(--bad)}
+.phases{display:grid;gap:8px;margin-top:12px}
+.phase{display:grid;grid-template-columns:88px 1fr 64px;align-items:center;gap:10px;font-size:12px}
+.phase .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.phase .bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .4s ease}
+.phase .bar i.done{background:var(--good)}
+.phase .n{text-align:right;color:var(--ink-2)}
+.running{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.running span{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;background:var(--accent-wash);color:var(--accent-2);border:1px solid transparent}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-top:10px}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0;color:var(--ink-2)}
+/* mini gate grid */
+.mini{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:10px}
+.mini span{height:22px;border-radius:5px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:500}
+.mini span.ok{background:var(--good-wash);color:var(--good)}
+.mini span.no{background:var(--bad-wash);color:var(--bad)}
+.mini span.na{background:var(--line);color:var(--ink-4)}
+.mini-l{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:10px;color:var(--ink-4);text-align:center;margin-top:4px;letter-spacing:.04em}
+/* KPI */
+.kpi{padding:12px 14px}
+.kpi .l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.kpi .v{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1.15;margin-top:4px}
+.kpi .d{font-size:12px;color:var(--ink-3);margin-top:4px;display:flex;justify-content:space-between;gap:8px}
+.kpi .d b{font-family:var(--mono);font-weight:500}
+.up{color:var(--good)} .down{color:var(--bad)}
+/* chart */
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--panel-2)}
+.seg button{border:0;background:transparent;color:var(--ink-3);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:32px}
+.seg button[aria-pressed="true"]{background:var(--accent-wash);color:var(--accent-2);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--accent-ring);outline-offset:-2px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-2)}
-.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.legend i{display:inline-block;width:18px;border-top:2px solid;vertical-align:middle;margin-right:6px}
 .legend i.dash{border-top-style:dashed}
-.chart-wrap{position:relative;height:340px;width:100%}
-@media (max-width:600px){.chart-wrap{height:260px}}
-.tablewrap{overflow-x:auto;border:1px solid var(--ring);border-radius:10px;background:var(--surface)}
+.chart{position:relative;height:380px;width:100%}
+@media (max-width:640px){.chart{height:260px}}
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:7px 9px;text-align:left;vertical-align:top;border-bottom:1px solid var(--grid);white-space:nowrap}
-th{position:sticky;top:0;background:var(--surface);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;z-index:1}
+th,td{padding:8px 10px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel-2);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;z-index:1}
 tr:last-child td{border-bottom:0}
-td.num,th.num{text-align:right}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent-wash) 40%,transparent)}
+td.num,th.num{text-align:right;font-family:var(--mono)}
 tr.base td{background:var(--accent-wash)}
-.cell{display:inline-block;min-width:54px;padding:1px 6px;border-radius:5px;font-variant-numeric:tabular-nums;text-align:right;border:1px solid transparent}
-.cell.ok{background:var(--good-wash);color:var(--good-text)}
-.cell.no{background:var(--crit-wash);color:var(--crit)}
-.cell.na{background:transparent;color:var(--muted);border-color:var(--grid)}
-.cell b{font-weight:600;margin-right:3px}
-.rnd{display:inline-block;padding:0 6px;border-radius:4px;background:var(--grid);color:var(--ink-2);font-size:11px;font-weight:600}
+.cell{display:inline-block;min-width:58px;padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:12px;text-align:right}
+.cell.ok{background:var(--good-wash);color:var(--good)}
+.cell.no{background:var(--bad-wash);color:var(--bad)}
+.cell.na{background:var(--line);color:var(--ink-4)}
+.gbar{display:inline-grid;grid-template-columns:repeat(10,8px);gap:2px;vertical-align:middle;margin-right:8px}
+.gbar i{height:14px;border-radius:2px;background:var(--line-2)}
+.gbar i.ok{background:var(--good)} .gbar i.no{background:var(--bad)}
+.rnd{display:inline-block;padding:0 6px;border-radius:4px;background:var(--line);color:var(--ink-2);font-family:var(--mono);font-size:11px;font-weight:600}
 .vid{font-weight:600}
-.note{white-space:normal;max-width:420px;color:var(--ink-2);font-size:12px}
-.dirs{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.dir{border:1px solid var(--ring);border-radius:8px;padding:8px 10px;background:var(--surface)}
-.dir .k{font-weight:600}
-.dir .p{color:var(--ink-2);font-size:12px;margin-top:2px}
-.running{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.running span{font-size:11px;padding:2px 7px;border-radius:4px;background:var(--accent-wash);color:var(--accent);font-variant-numeric:tabular-nums}
-.foot{margin-top:28px;color:var(--muted);font-size:12px}
-.two{display:grid;gap:12px;grid-template-columns:1fr 1fr}
-@media (max-width:820px){.two{grid-template-columns:1fr}}
-.up{color:var(--good-text)} .down{color:var(--crit)}
+.note{white-space:normal;max-width:460px;color:var(--ink-3);font-size:12px;line-height:1.4}
+/* rounds */
+.steps{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.step{position:relative;padding:14px 16px 14px 18px}
+.step::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:2px;background:var(--line-2)}
+.step.run::before{background:var(--accent)} .step.done::before{background:var(--ink-4)}
+.step .t{display:flex;align-items:center;gap:8px;font-weight:600}
+.step .m{color:var(--ink-3);font-size:12px;margin-top:4px}
+.dirs{display:grid;gap:8px}
+.dir{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:12px}
+.dir .k{font-family:var(--mono);font-weight:600;color:var(--accent-2);white-space:nowrap}
+.dir .p{color:var(--ink-3)}
+.foot{margin-top:28px;color:var(--ink-4);font-size:12px;line-height:1.6}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
-<header>
-  <div>
-    <p class="eyebrow">ABGT · 曝險型趨勢策略 優化迴圈</p>
-    <h1>ABGT 優化儀表板</h1>
-    <p class="sub" id="hdr-sub"></p>
+<div class="top"><div class="wrap">
+  <div class="brand"><div class="mark">Σ</div><div><h1>ABGT Console</h1><div class="sub">曝險型趨勢策略 · 多代理優化迴圈</div></div></div>
+  <div class="chips" id="top-chips"></div>
+  <div class="live"><span class="dot" id="live-dot"></span><span id="live-text">連線中…</span></div>
+</div></div>
+
+<div class="wrap">
+<section class="grid g3">
+  <div class="panel" id="loop-panel"></div>
+  <div class="panel" id="base-panel"></div>
+  <div class="panel" id="dir-panel"></div>
+</section>
+
+<section>
+  <div class="panel-h"><h2>基準 vs 買入持有 · 全期 2020-01 → 今</h2><span class="muted" style="font-size:12px">閘門 = Sharpe、Calmar 高於持有且回撤更小</span></div>
+  <div class="grid g6" id="kpi"></div>
+</section>
+
+<section class="panel">
+  <div class="panel-h">
+    <h2>權益曲線 · 起點 100 · 對數刻度</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="seg" role="group" aria-label="標的" id="asset-seg"></div>
+      <div class="seg" role="group" aria-label="區間" id="win-seg"><button type="button" data-w="FULL" aria-pressed="true">全期</button><button type="button" data-w="OOS" aria-pressed="false">OOS 2023→</button></div>
+    </div>
   </div>
-  <div id="hdr-pills" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-</header>
-
-<section>
-  <div class="grid status" id="status-grid"></div>
+  <div class="legend" id="legend" style="margin-bottom:8px"></div>
+  <div class="chart"><canvas id="eq" role="img" aria-label="權益曲線"></canvas></div>
+  <p class="muted" style="font-size:12px;margin-top:8px">底色：藍 = IS 2020-01→2022-12（含 2021 牛市、2022 熊市），橙 = OOS 2023-01→今。滑鼠移過看數值。</p>
 </section>
 
 <section>
-  <h2>基準 vs 買入持有（全期 2020-01 → 今，風險調整口徑）</h2>
-  <div class="grid kpi" id="kpi-grid"></div>
-</section>
-
-<section class="card">
-  <div class="toolbar">
-    <h2 style="margin:0">權益曲線（起點 = 100，對數刻度）</h2>
-    <div class="seg" role="group" aria-label="標的" id="asset-seg"></div>
-    <div class="legend" id="legend"></div>
-  </div>
-  <div class="chart-wrap"><canvas id="eq-chart" aria-label="權益曲線圖" role="img"></canvas></div>
-  <p class="sub" style="font-size:12px;margin-top:8px">底色：藍 = IS 2020-01→2022-12（含 2021 牛市與 2022 熊市），橙 = OOS 2023-01→今。B&amp;H = 同期買入持有。</p>
+  <div class="panel-h"><h2 id="lb-title">變體排行</h2><span class="muted" style="font-size:12px">每格 = 該標的 × 區間的 Sharpe；✓ 過閘門、✗ 未過、灰 = 該輪未評估。OOS Δ = 對基準的最低 OOS ΔSharpe。</span></div>
+  <div class="tablewrap"><table id="lb"></table></div>
 </section>
 
 <section>
-  <h2>回合進度</h2>
-  <div class="rounds" id="rounds"></div>
-  <div id="progress" style="margin-top:12px"></div>
+  <div class="panel-h"><h2>回合進度</h2></div>
+  <div class="steps" id="steps"></div>
+</section>
+
+<section class="grid g2">
+  <div><div class="panel-h"><h2>原始策略回測 · 2023-01 → 今</h2></div><div class="tablewrap"><table id="legacy"></table></div></div>
+  <div><div class="panel-h"><h2>基準壓力測試 · ema50_plain · Sharpe</h2></div><div class="tablewrap"><table id="stress"></table></div></div>
 </section>
 
 <section>
-  <h2 id="variants-title">變體排行</h2>
-  <p class="sub" style="font-size:12px;margin-bottom:8px">每格 = 該標的 × 區間的 Sharpe；綠 ✓ 過閘門（Sharpe、Calmar 高於持有且回撤更小），紅 ✗ 未過，灰 = 該輪未評估。OOS Δ = 對基準 ema50_plain 的最低 OOS ΔSharpe；敏感度 = OOS 各格參數擾動的最低通過率。</p>
-  <div class="tablewrap"><table id="variants"></table></div>
-</section>
-
-<section class="two">
-  <div>
-    <h2>原始策略回測（2023-01 → 今）</h2>
-    <div class="tablewrap"><table id="legacy"></table></div>
-  </div>
-  <div>
-    <h2>基準壓力測試（ema50_plain，Sharpe）</h2>
-    <div class="tablewrap"><table id="stress"></table></div>
-  </div>
-</section>
-
-<section>
-  <h2>資料涵蓋</h2>
+  <div class="panel-h"><h2>資料涵蓋</h2></div>
   <div class="tablewrap"><table id="coverage"></table></div>
 </section>
 
 <p class="foot" id="foot"></p>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
@@ -166,149 +218,180 @@ const pct = (x, d = 1) => x == null ? '—' : ((x >= 0 ? '+' : '') + (x * 100).t
 const num = (x, d = 2) => x == null ? '—' : Number(x).toFixed(d);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CELLS = DATA.cells;
 
-// ---- header / status ----
-(function(){
-  const L = DATA.loop, B = DATA.baseline;
-  $('#hdr-sub').textContent = `第 ${L.round} 輪 · 基準 ${B.id} · 產生於 ${DATA.generated}`;
-  const running = /running/.test(L.status || '');
-  $('#hdr-pills').innerHTML =
-    `<span class="pill ${running ? 'run' : ''}">${running ? '● 工作流進行中' : '○ 等待下一輪'}</span>` +
-    `<span class="pill ${L.rounds_without_champion >= 2 ? 'warn' : ''}">無新冠軍 ${L.rounds_without_champion}/3</span>`;
-  const strikes = [0,1,2].map(i => `<span class="${i < L.rounds_without_champion ? 'hit' : ''}"></span>`).join('');
-  const dirs = (DATA.directions || []).map(d => `<div class="dir"><div class="k">${esc(d.key)} <span class="rnd">×${d.n}</span></div><div class="p">${esc(d.prompt)}…</div></div>`).join('');
-  $('#status-grid').innerHTML = `
-    <div class="card stat"><div class="label">現任基準</div><div class="value" style="font-size:20px">${esc(B.id)}</div><div class="cmp">六格平均 Sharpe ${num(B.meanSharpe)} · ${esc(B.note)}</div></div>
-    <div class="card stat"><div class="label">停止規則</div><div class="value">${L.rounds_without_champion}<small>/ 3 輪無新冠軍</small></div><div class="strike">${strikes}</div><div class="cmp">${esc(L.stop_rule)}</div></div>
-    <div class="card stat"><div class="label">狀態</div><div class="value" style="font-size:18px">${esc(L.status)}</div><div class="cmp">狀態檔更新 ${esc(L.updated)}</div></div>`;
-  if (dirs) $('#status-grid').insertAdjacentHTML('afterend', `<div style="margin-top:12px"><p class="eyebrow" style="margin-bottom:6px">第 ${L.round} 輪設計方向</p><div class="dirs">${dirs}</div></div>`);
+// ---------- live status ----------
+let status = DATA.status || {};
+let liveMode = 'snapshot';
+function ago(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${Math.round(s)} 秒前`;
+  if (s < 3600) return `${Math.round(s / 60)} 分鐘前`;
+  return `${(s / 3600).toFixed(1)} 小時前`;
+}
+function renderLive() {
+  const dot = $('#live-dot'), txt = $('#live-text');
+  const upd = status.updated_at ? ago(status.updated_at) : '';
+  if (liveMode === 'live') { dot.className = 'dot on'; txt.textContent = `即時 · 狀態更新於 ${upd}`; }
+  else if (liveMode === 'connecting') { dot.className = 'dot wait'; txt.textContent = '連線中…'; }
+  else { dot.className = 'dot'; txt.textContent = `快照 · ${upd || DATA.generated}`; }
+}
+function renderStatus() {
+  const S = status, running = /running/.test(S.status || '');
+  const phaseDefs = [['design','設計'],['impl','實作評估'],['verify','驗證'],['synthesize','綜合']];
+  const totals = S.phase_totals || {};
+  const counts = S.phase_counts || {};
+  $('#top-chips').innerHTML =
+    `<span class="chip acc">第 <b>${S.round}</b> 輪</span>` +
+    `<span class="chip ${running ? 'good' : ''}">${running ? '● 工作流進行中' : '○ 等待下一輪'}</span>` +
+    `<span class="chip ${S.rounds_without_champion >= 2 ? 'warn' : ''}">無新冠軍 <b>${S.rounds_without_champion}</b>/3</span>` +
+    (S.agents_done != null ? `<span class="chip">代理 <b>${S.agents_done}</b>${S.agents_total ? ` / ${S.agents_total}` : ''}</span>` : '');
+  const strikes = [0,1,2].map(i => `<span class="${i < S.rounds_without_champion ? 'hit' : ''}"></span>`).join('');
+  const phases = phaseDefs.map(([k, label]) => {
+    const n = counts[k] || 0, t = totals[k];
+    const w = t ? Math.min(100, 100 * n / t) : (n ? 100 : 0);
+    return `<div class="phase"><span>${label}</span><div class="bar"><i class="${t && n >= t ? 'done' : ''}" style="width:${w}%"></i></div><span class="n num">${n}${t ? ` / ${t}` : ''}</span></div>`;
+  }).join('');
+  const run = (S.running || []).map(x => `<span>${esc(x)}</span>`).join('');
+  $('#loop-panel').innerHTML = `<div class="panel-h"><h2>迴圈狀態</h2><span class="chip ${running ? 'good' : ''}" style="font-size:11px">${esc(S.status || '')}</span></div>
+    <div class="big">R${S.round}<small>${running ? '進行中' : '整合中'}</small></div>
+    <div class="strikes">${strikes}</div><div class="muted" style="font-size:12px">停止規則：連續 3 輪沒有新冠軍</div>
+    <div class="phases">${phases}</div>
+    ${run ? `<div class="muted" style="font-size:11px;margin-top:10px">執行中的代理</div><div class="running">${run}</div>` : ''}
+    <dl class="kv"><dt>工作流</dt><dd class="mono">${esc(S.run_id || '—')}</dd><dt>本輪變體</dt><dd>${S.variants_planned ?? '—'} 個</dd><dt>訊息</dt><dd>${esc(S.message || '')}</dd></dl>`;
+  renderLive();
+}
+renderStatus();
+setInterval(renderLive, 10000);
+(async () => {
+  try {
+    if (!window.claude || typeof window.claude.use !== 'function') { renderLive(); return; }
+    liveMode = 'connecting'; renderLive();
+    const db = await window.claude.use('db');
+    if (!db) { liveMode = 'snapshot'; renderLive(); return; }
+    db.doc('status/current').onSnapshot((snap) => {
+      if (snap.exists) { status = Object.assign({}, snap.data()); liveMode = 'live'; renderStatus(); }
+      else { liveMode = 'snapshot'; renderLive(); }
+    }, () => { liveMode = 'snapshot'; renderLive(); });
+  } catch (_) { liveMode = 'snapshot'; renderLive(); }
 })();
 
-// ---- KPI ----
+// ---------- baseline & directions ----------
 (function(){
-  const V = DATA.variants.find(v => v.id === DATA.baseline.id);
-  if (!V) return;
+  const B = DATA.baseline, V = DATA.variants.find(v => v.id === B.id);
+  const cellsOf = (a) => ['IS','OOS','FULL','IS2','OOS2'].map(w => { const c = V && V.cells[`${a}_${w}`]; return c ? `<span class="${c.gate ? 'ok' : 'no'}" title="${a} ${w}">${num(c.sharpe)}</span>` : `<span class="na">—</span>`; }).join('');
+  $('#base-panel').innerHTML = `<div class="panel-h"><h2>現任基準</h2><span class="chip acc">六格平均 Sharpe <b>${num(B.meanSharpe)}</b></span></div>
+    <div style="font-family:var(--mono);font-size:20px;font-weight:600">${esc(B.id)}</div>
+    <p class="muted" style="font-size:12px;margin-top:4px">${esc(B.note)}</p>
+    <div class="muted" style="font-size:11px;margin-top:10px;letter-spacing:.06em">BTC</div><div class="mini">${cellsOf('BTC')}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px;letter-spacing:.06em">ETH</div><div class="mini">${cellsOf('ETH')}</div>
+    <div class="mini-l"><span>IS</span><span>OOS</span><span>FULL</span><span>IS2</span><span>OOS2</span></div>`;
+  $('#dir-panel').innerHTML = `<div class="panel-h"><h2>第 ${DATA.loop.round} 輪設計方向</h2><span class="chip">${DATA.directions.length} 個 · ${DATA.directions.reduce((a, d) => a + d.n, 0)} 個變體</span></div>
+    <div class="dirs">${DATA.directions.map(d => `<div class="dir"><span class="k">${esc(d.key)} ×${d.n}</span><span class="p">${esc(d.prompt)}…</span></div>`).join('')}</div>`;
+})();
+
+// ---------- KPI ----------
+(function(){
+  const V = DATA.variants.find(v => v.id === DATA.baseline.id); if (!V) return;
+  const bhDD = {BTC: -0.767, ETH: -0.794};
   const tiles = [];
   for (const a of ['BTC','ETH']) {
     const c = V.cells[`${a}_FULL`]; if (!c) continue;
-    tiles.push(`<div class="card stat"><div class="label">${a} 全期淨報酬</div><div class="value">${pct(c.ret,0)}</div><div class="cmp">持有 ${pct(DATA.curves[a] ? (DATA.curves[a].bh.at(-1)/100-1) : null,0)}</div></div>`);
-    tiles.push(`<div class="card stat"><div class="label">${a} 最大回撤</div><div class="value">${pct(c.dd,0)}</div><div class="cmp">持有 ${a==='BTC'?'−77%':'−79%'}</div></div>`);
-    tiles.push(`<div class="card stat"><div class="label">${a} Sharpe</div><div class="value">${num(c.sharpe)}<small>${c.gate ? '✓ 過閘' : '✗'}</small></div><div class="cmp">持有 ${num(c.bh_sharpe)}</div></div>`);
+    const bhRet = DATA.curves[a] ? DATA.curves[a].bh.at(-1) / 100 - 1 : null;
+    tiles.push(`<div class="panel kpi"><div class="l">${a} 淨報酬</div><div class="v">${pct(c.ret, 0)}</div><div class="d"><span>持有</span><b>${pct(bhRet, 0)}</b></div></div>`);
+    tiles.push(`<div class="panel kpi"><div class="l">${a} 最大回撤</div><div class="v ${c.dd > bhDD[a] ? 'up' : 'down'}">${pct(c.dd, 0)}</div><div class="d"><span>持有</span><b>${pct(bhDD[a], 0)}</b></div></div>`);
+    tiles.push(`<div class="panel kpi"><div class="l">${a} Sharpe</div><div class="v ${c.gate ? 'up' : 'down'}">${num(c.sharpe)}</div><div class="d"><span>持有 ${num(c.bh_sharpe)}</span><b>${c.gate ? '✓ 過閘' : '✗ 未過'}</b></div></div>`);
   }
-  $('#kpi-grid').innerHTML = tiles.join('');
+  $('#kpi').innerHTML = tiles.join('');
 })();
 
-// ---- equity chart ----
-let chart, asset = 'BTC';
-function seriesColor(k){ return {ema50_plain: css('--s1'), vol_atr_channel: css('--s2'), bh: css('--bh')}[k]; }
-const shading = {
-  id: 'shading',
-  beforeDraw(ch) {
-    const {ctx, chartArea: ca, scales: {x}} = ch;
-    const labels = ch.data.labels;
-    const idxOf = (d) => { let i = labels.findIndex(l => l >= d); return i < 0 ? labels.length - 1 : i; };
-    const draw = (from, to, color) => {
-      const x0 = x.getPixelForValue(idxOf(from)), x1 = to ? x.getPixelForValue(idxOf(to)) : ca.right;
-      ctx.save(); ctx.fillStyle = color; ctx.fillRect(x0, ca.top, x1 - x0, ca.bottom - ca.top); ctx.restore();
-    };
-    draw(DATA.windows.IS[0], DATA.windows.IS[1], css('--is-wash'));
-    draw(DATA.windows.OOS[0], null, css('--oos-wash'));
-  }
-};
-function render() {
-  const C = DATA.curves[asset]; if (!C) return;
-  const ds = [
-    {label: 'ema50_plain（基準）', key: 'ema50_plain', data: C.ema50_plain, borderColor: seriesColor('ema50_plain'), borderWidth: 2, pointRadius: 0, tension: 0},
-    {label: 'vol_atr_channel', key: 'vol_atr_channel', data: C.vol_atr_channel, borderColor: seriesColor('vol_atr_channel'), borderWidth: 2, pointRadius: 0, tension: 0},
-    {label: 'B&H 買入持有', key: 'bh', data: C.bh, borderColor: seriesColor('bh'), borderWidth: 1.5, borderDash: [5,4], pointRadius: 0, tension: 0},
-  ];
-  const ink2 = css('--ink-2'), grid = css('--grid');
-  if (chart) chart.destroy();
-  chart = new Chart($('#eq-chart'), {
-    type: 'line', plugins: [shading],
-    data: {labels: C.dates, datasets: ds},
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      interaction: {mode: 'index', intersect: false},
-      plugins: {
-        legend: {display: false},
-        tooltip: {callbacks: {label: (t) => `${t.dataset.label}：${t.parsed.y.toFixed(0)}（${(t.parsed.y/100-1 >= 0 ? '+' : '')}${((t.parsed.y/100-1)*100).toFixed(0)}%）`}}
-      },
-      scales: {
-        x: {ticks: {color: ink2, maxTicksLimit: 8, maxRotation: 0, callback: (v, i) => C.dates[i]?.slice(0,7)}, grid: {color: grid}},
-        y: {type: 'logarithmic', ticks: {color: ink2, callback: (v) => [50,100,200,500,1000,2000,5000,10000,20000].includes(v) ? v : ''}, grid: {color: grid}}
-      }
-    }
-  });
-  $('#legend').innerHTML = ds.map(d => `<span><i style="border-color:${d.borderColor}" class="${d.key==='bh'?'dash':''}"></i>${d.label}</span>`).join('');
-  document.querySelectorAll('#asset-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === asset));
+// ---------- equity chart ----------
+let chart, asset = 'BTC', win = 'FULL';
+const shading = { id: 'shading', beforeDraw(ch) {
+  const {ctx, chartArea: ca, scales: {x}} = ch; const labels = ch.data.labels;
+  const idxOf = (d) => { const i = labels.findIndex(l => l >= d); return i < 0 ? labels.length - 1 : i; };
+  const draw = (from, to, color) => { const x0 = x.getPixelForValue(idxOf(from)), x1 = to ? x.getPixelForValue(idxOf(to)) : ca.right; ctx.save(); ctx.fillStyle = color; ctx.fillRect(Math.max(x0, ca.left), ca.top, Math.max(0, x1 - Math.max(x0, ca.left)), ca.bottom - ca.top); ctx.restore(); };
+  if (labels[0] < DATA.windows.IS[1]) draw(DATA.windows.IS[0], DATA.windows.IS[1], css('--is-wash'));
+  draw(DATA.windows.OOS[0], null, css('--oos-wash'));
+}};
+function slice(C) {
+  if (win === 'FULL') return C;
+  const i = C.dates.findIndex(d => d >= DATA.windows.OOS[0]); if (i < 0) return C;
+  const norm = (arr) => { const b = arr[i]; return arr.slice(i).map(v => +(v / b * 100).toFixed(2)); };
+  return {dates: C.dates.slice(i), ema50_plain: norm(C.ema50_plain), vol_atr_channel: norm(C.vol_atr_channel), bh: norm(C.bh)};
 }
-$('#asset-seg').innerHTML = Object.keys(DATA.curves).map(a => `<button type="button" data-a="${a}" aria-pressed="${a===asset}">${a}</button>`).join('');
-$('#asset-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; asset = b.dataset.a; render(); });
-try { asset = localStorage.getItem('abgt-asset') || asset; } catch (_) {}
-$('#asset-seg').addEventListener('click', () => { try { localStorage.setItem('abgt-asset', asset); } catch (_) {} });
+function render() {
+  const C0 = DATA.curves[asset]; if (!C0) return; const C = slice(C0);
+  const ds = [
+    {label: 'ema50_plain（基準）', key: 'ema50_plain', data: C.ema50_plain, borderColor: css('--s1'), borderWidth: 2, pointRadius: 0, tension: 0},
+    {label: 'vol_atr_channel', key: 'vol_atr_channel', data: C.vol_atr_channel, borderColor: css('--s2'), borderWidth: 2, pointRadius: 0, tension: 0},
+    {label: 'B&H 買入持有', key: 'bh', data: C.bh, borderColor: css('--bh'), borderWidth: 1.5, borderDash: [5,4], pointRadius: 0, tension: 0},
+  ];
+  const ink3 = css('--ink-3'), grid = css('--line');
+  if (chart) chart.destroy();
+  chart = new Chart($('#eq'), { type: 'line', plugins: [shading], data: {labels: C.dates, datasets: ds},
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
+      plugins: { legend: {display: false}, tooltip: { backgroundColor: css('--panel-2'), titleColor: css('--ink'), bodyColor: css('--ink-2'), borderColor: css('--line-2'), borderWidth: 1,
+        callbacks: { label: (t) => `${t.dataset.label}：${t.parsed.y.toFixed(0)}（${pct(t.parsed.y / 100 - 1, 0)}）` } } },
+      scales: { x: {ticks: {color: ink3, maxTicksLimit: 8, maxRotation: 0, font: {family: css('--mono')}, callback: (v, i) => C.dates[i]?.slice(0, 7)}, grid: {color: grid}},
+                y: {type: 'logarithmic', ticks: {color: ink3, font: {family: css('--mono')}, callback: (v) => [25,50,100,200,500,1000,2000,5000,10000,20000].includes(v) ? v : ''}, grid: {color: grid}} } } });
+  $('#legend').innerHTML = ds.map(d => `<span><i style="border-color:${d.borderColor}" class="${d.key === 'bh' ? 'dash' : ''}"></i>${d.label}</span>`).join('');
+  document.querySelectorAll('#asset-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === asset));
+  document.querySelectorAll('#win-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.w === win));
+}
+$('#asset-seg').innerHTML = Object.keys(DATA.curves).map(a => `<button type="button" data-a="${a}" aria-pressed="${a === asset}">${a}</button>`).join('');
+try { asset = localStorage.getItem('abgt-asset') || asset; win = localStorage.getItem('abgt-win') || win; } catch (_) {}
+$('#asset-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; asset = b.dataset.a; try { localStorage.setItem('abgt-asset', asset); } catch (_) {} render(); });
+$('#win-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; win = b.dataset.w; try { localStorage.setItem('abgt-win', win); } catch (_) {} render(); });
 render();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 
-// ---- rounds ----
+// ---------- leaderboard ----------
 (function(){
-  const P = DATA.progress || {};
-  $('#rounds').innerHTML = DATA.rounds.map(r => {
-    const running = r.duration_min == null;
-    const champ = r.champion ? `<span class="pill good">冠軍 ${esc(r.champion)}</span>` : (running ? `<span class="pill run">進行中</span>` : `<span class="pill">無新冠軍</span>`);
-    return `<div class="round ${running ? 'run' : 'done'}"><div class="t">第 ${r.round} 輪 ${champ}</div>
-      <div class="m">${running ? `啟動 ${esc(r.started)}` : `${r.agents} 個代理 · ${r.duration_min} 分鐘`} · ${r.variants} 個變體${r.verified != null ? ` · 驗證 ${r.verified} 個` : ''}</div>
-      <div class="m">${esc(r.note)}</div></div>`;
-  }).join('');
-  if (P.journal) {
-    const ph = Object.entries(P.phases || {}).map(([k, v]) => `${k} ${v}`).join(' · ');
-    $('#progress').innerHTML = `<div class="card"><div class="eyebrow">目前工作流 ${esc(P.run_id)}</div>
-      <div style="margin-top:4px">已完成 <b>${P.done}</b> 個代理${ph ? `（${esc(ph)}）` : ''}${P.running && P.running.length ? ' · 執行中：' : ''}</div>
-      ${P.running && P.running.length ? `<div class="running">${P.running.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}</div>`;
-  }
-})();
-
-// ---- variants table ----
-(function(){
-  const cols = DATA.cells;
-  const head = `<thead><tr><th>變體</th><th>輪</th><th class="num">閘門</th><th class="num">平均 Sharpe</th><th class="num">OOS Δ</th><th class="num">敏感度</th>${cols.map(c => `<th class="num">${c.replace('_',' ')}</th>`).join('')}<th>一句話</th></tr></thead>`;
+  const head = `<thead><tr><th>變體</th><th>輪</th><th>閘門 (10)</th><th class="num">平均 Sharpe</th><th class="num">OOS Δ</th><th class="num">敏感度</th>${CELLS.map(c => `<th class="num">${c.replace('_', ' ')}</th>`).join('')}<th>結論</th></tr></thead>`;
   const rows = DATA.variants.map(v => {
     const isBase = v.id === DATA.baseline.id;
-    const cells = cols.map(c => {
-      const x = v.cells[c];
-      if (!x) return `<td class="num"><span class="cell na">—</span></td>`;
-      return `<td class="num"><span class="cell ${x.gate ? 'ok' : 'no'}" title="回撤 ${pct(x.dd,0)} · 淨報酬 ${pct(x.ret,0)} · 持有 Sharpe ${num(x.bh_sharpe)}"><b>${x.gate ? '✓' : '✗'}</b>${num(x.sharpe)}</span></td>`;
-    }).join('');
+    const bar = `<span class="gbar">${CELLS.map(c => { const x = v.cells[c]; return `<i class="${x ? (x.gate ? 'ok' : 'no') : ''}"></i>`; }).join('')}</span>`;
+    const cells = CELLS.map(c => { const x = v.cells[c]; if (!x) return `<td class="num"><span class="cell na">—</span></td>`;
+      return `<td class="num"><span class="cell ${x.gate ? 'ok' : 'no'}" title="回撤 ${pct(x.dd, 0)} · 淨報酬 ${pct(x.ret, 0)} · 持有 Sharpe ${num(x.bh_sharpe)}">${x.gate ? '✓' : '✗'} ${num(x.sharpe)}</span></td>`; }).join('');
     const d = v.min_doos;
-    return `<tr class="${isBase ? 'base' : ''}"><td><span class="vid">${esc(v.id)}</span>${isBase ? ' <span class="pill" style="font-size:10px">基準</span>' : ''}<div class="note">${esc(v.name)}</div></td>
-      <td><span class="rnd">R${v.round}</span></td><td class="num"><b>${v.gates}</b>/${v.evaluated}</td><td class="num">${num(v.mean_sharpe)}</td>
+    return `<tr class="${isBase ? 'base' : ''}"><td><span class="vid">${esc(v.id)}</span>${isBase ? ' <span class="chip acc" style="font-size:10px;padding:1px 6px">基準</span>' : ''}<div class="note">${esc(v.name)}</div></td>
+      <td><span class="rnd">R${v.round}</span></td><td>${bar}<span class="num"><b>${v.gates}</b>/${v.evaluated}</span></td><td class="num">${num(v.mean_sharpe)}</td>
       <td class="num ${d == null ? '' : (d >= -0.05 ? 'up' : 'down')}">${d == null ? '—' : (d >= 0 ? '+' : '') + num(d)}</td>
-      <td class="num">${v.min_sens == null ? '—' : Math.round(v.min_sens*100) + '%'}</td>${cells}<td class="note">${esc(v.note || v.description)}</td></tr>`;
+      <td class="num">${v.min_sens == null ? '—' : Math.round(v.min_sens * 100) + '%'}</td>${cells}<td class="note">${esc(v.note || v.description)}</td></tr>`;
   }).join('');
-  $('#variants').innerHTML = head + `<tbody>${rows}</tbody>`;
-  $('#variants-title').textContent = `變體排行（${DATA.variants.length} 個，依閘門數 → 平均 Sharpe）`;
+  $('#lb').innerHTML = head + `<tbody>${rows}</tbody>`;
+  $('#lb-title').textContent = `變體排行 · ${DATA.variants.length} 個 · 依閘門數 → 平均 Sharpe`;
 })();
 
-// ---- legacy / stress / coverage ----
+// ---------- rounds ----------
 (function(){
-  $('#legacy').innerHTML = `<thead><tr><th>策略</th><th>標的</th><th class="num">淨報酬</th><th class="num">回撤</th><th class="num">Sharpe</th><th class="num">回合</th><th class="num">持有報酬</th><th class="num">持有回撤</th><th>閘門</th></tr></thead><tbody>` +
-    DATA.legacy.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.symbol.split(':')[0])} ${esc(r.tf)}</td><td class="num">${pct(r.net_return)}</td><td class="num">${pct(r.max_dd)}</td><td class="num">${num(r.sharpe)}</td><td class="num">${r.round_trips ?? '—'}</td><td class="num">${pct(r.bh_net)}</td><td class="num">${pct(r.bh_dd)}</td><td><span class="pill ${r.gate ? 'good' : 'crit'}">${r.gate ? '✓ 過' : '✗ 未過'}</span></td></tr>`).join('') + '</tbody>';
-  const S = DATA.stress;
-  const assets = Object.keys(S);
+  $('#steps').innerHTML = DATA.rounds.map(r => {
+    const running = r.duration_min == null;
+    const tag = r.champion ? `<span class="chip good">冠軍 ${esc(r.champion)}</span>` : (running ? `<span class="chip acc">進行中</span>` : `<span class="chip">無新冠軍</span>`);
+    return `<div class="panel step ${running ? 'run' : 'done'}"><div class="t">第 ${r.round} 輪 ${tag}</div>
+      <div class="m num">${running ? `啟動 ${esc(r.started)}` : `${r.agents} 個代理 · ${r.duration_min} 分鐘`} · ${r.variants} 個變體${r.verified != null ? ` · 驗證 ${r.verified} 個` : ''}</div>
+      <div class="m">${esc(r.note)}</div></div>`;
+  }).join('');
+})();
+
+// ---------- legacy / stress / coverage ----------
+(function(){
+  $('#legacy').innerHTML = `<thead><tr><th>策略</th><th>標的</th><th class="num">淨報酬</th><th class="num">回撤</th><th class="num">Sharpe</th><th class="num">回合</th><th class="num">持有</th><th>閘門</th></tr></thead><tbody>` +
+    DATA.legacy.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.symbol.split(':')[0])} ${esc(r.tf)}</td><td class="num">${pct(r.net_return)}</td><td class="num">${pct(r.max_dd)}</td><td class="num">${num(r.sharpe)}</td><td class="num">${r.round_trips ?? '—'}</td><td class="num">${pct(r.bh_net)} / ${pct(r.bh_dd)}</td><td><span class="chip ${r.gate ? 'good' : 'bad'}">${r.gate ? '✓ 過' : '✗ 未過'}</span></td></tr>`).join('') + '</tbody>';
+  const S = DATA.stress, assets = Object.keys(S);
   if (assets.length) {
     const wins = ['IS','OOS','FULL','IS2','OOS2'];
     let html = `<thead><tr><th>情境</th>${assets.map(a => wins.map(w => `<th class="num">${a} ${w}</th>`).join('')).join('')}</tr></thead><tbody>`;
-    const names = Object.keys(S[assets[0]]);
-    for (const n of names) {
-      html += `<tr><td>${esc(n)}${assets.map(a => S[a][n] && S[a][n]._cost != null ? ` <span class="sub" style="font-size:11px">${a} ≈${(S[a][n]._cost*100).toFixed(1)}%/年</span>` : '').join('')}</td>` +
-        assets.map(a => wins.map(w => { const x = S[a][n] && S[a][n][w]; return x ? `<td class="num"><span class="cell ${x.pass ? 'ok' : 'no'}"><b>${x.pass ? '✓' : '✗'}</b>${num(x.sharpe)}</span></td>` : '<td class="num"><span class="cell na">—</span></td>'; }).join('')).join('') + '</tr>';
+    for (const n of Object.keys(S[assets[0]])) {
+      html += `<tr><td>${esc(n)}${assets.map(a => S[a][n] && S[a][n]._cost != null ? ` <span class="muted" style="font-size:11px">${a} ≈${(S[a][n]._cost * 100).toFixed(1)}%/年</span>` : '').join('')}</td>` +
+        assets.map(a => wins.map(w => { const x = S[a][n] && S[a][n][w]; return x ? `<td class="num"><span class="cell ${x.pass ? 'ok' : 'no'}">${x.pass ? '✓' : '✗'} ${num(x.sharpe)}</span></td>` : '<td class="num"><span class="cell na">—</span></td>'; }).join('')).join('') + '</tr>';
     }
     $('#stress').innerHTML = html + '</tbody>';
-  } else {
-    $('#stress').innerHTML = '<tbody><tr><td class="sub">尚未跑壓力測試</td></tr></tbody>';
-  }
+  } else { $('#stress').innerHTML = '<tbody><tr><td class="muted">尚未跑壓力測試</td></tr></tbody>'; }
   $('#coverage').innerHTML = `<thead><tr><th>標的</th><th>週期</th><th>起</th><th>迄</th><th class="num">K 線數</th><th class="num">資金費率天數</th><th class="num">年化費率（均值）</th></tr></thead><tbody>` +
-    DATA.coverage.map(r => `<tr><td>${esc(r.asset)}</td><td>${esc(r.tf)}</td><td>${esc(r.start)}</td><td>${esc(r.end)}</td><td class="num">${r.bars.toLocaleString()}</td><td class="num">${r.funding_days || '—'}</td><td class="num">${r.funding_annual == null ? '—' : pct(r.funding_annual)}</td></tr>`).join('') + '</tbody>';
-  $('#foot').textContent = `資料來源：Binance USDT-M 永續日線（ccxt）、results/variants/*.json、experiments/rounds/loop_state.json。閘門 = 風險調整（Sharpe、Calmar 高於同期買入持有且最大回撤更小）。此頁由 build_dashboard.py 產生，每輪整合後重新發佈。`;
+    DATA.coverage.map(r => `<tr><td>${esc(r.asset)}</td><td>${esc(r.tf)}</td><td class="num">${esc(r.start)}</td><td class="num">${esc(r.end)}</td><td class="num">${r.bars.toLocaleString()}</td><td class="num">${r.funding_days || '—'}</td><td class="num">${r.funding_annual == null ? '—' : pct(r.funding_annual)}</td></tr>`).join('') + '</tbody>';
+  $('#foot').textContent = `資料：Binance USDT-M 永續日線（ccxt）、results/variants/*.json、experiments/rounds/loop_state.json。即時狀態來自 artifact 資料庫 status/current，由優化迴圈在每次喚醒與每個階段完成時寫入；頁面由 build_dashboard.py 產生。產生於 ${DATA.generated}。`;
 })();
 </script>
