@@ -84,8 +84,10 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
     lag_base = 1.0
     lag_events: list[dict] = []
     funding_paid = 0.0
+    borrow_paid = 0.0
     notional = 0.0
     n_pause = 0
+    bars_per_year = 365.0 * 86400.0 / pd.Series(idx).diff().dropna().median().total_seconds()
 
     def fill_bar(i: int) -> int:
         return i + 1 + rp.exec_delay_bars
@@ -135,6 +137,13 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
                     cash -= cost
                     funding_paid += cost
         eqv = cash + sum(qty[k] * c[k][i] for k in keys)
+        if rp.borrow_rate_annual > 0 and eqv > 0:
+            borrowed = max(0.0, sum(qty[k] * c[k][i] for k in keys) - eqv)
+            if borrowed > 0:
+                cost = borrowed * rp.borrow_rate_annual / bars_per_year
+                cash -= cost
+                borrow_paid += cost
+                eqv -= cost
         bench[i] = sum(bench_qty[k] * c[k][i] for k in keys)
         ratio = eqv / bench[i] if bench[i] > 0 else 1.0
         ratio_hist[i] = ratio
@@ -208,7 +217,9 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
         rt["pnl"] = rt["log_ret"]
     extra = {
         "assets": keys, "weights": weights,
-        "n_fills": len(fills), "funding_paid": funding_paid,
+        "n_fills": len(fills), "funding_paid": funding_paid, "borrow_paid": borrow_paid,
+        "max_exposure_seen": float(np.nanmax(total_expo)) if len(total_expo) else 0.0,
+        "min_equity": float(np.nanmin(eq_s)) if len(eq_s) else 0.0,
         "notional_turnover_per_year": float(notional / np.nanmean(eq_s) / years) if np.nanmean(eq_s) > 0 else 0.0,
         "avg_exposure": float(np.nanmean(total_expo)), "time_in_market": float(np.mean(total_expo > 0)),
         "avg_exposure_by_asset": {k: float(np.nanmean(expo[k][start_idx:])) for k in keys},

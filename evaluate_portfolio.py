@@ -57,6 +57,12 @@ def main() -> int:
     ap.add_argument("--weights", default="0.5,0.5")
     ap.add_argument("--windows", default=DEFAULT_WINDOWS + "," + ALT_WINDOWS)
     ap.add_argument("--rebalance-threshold", type=float, default=0.15)
+    ap.add_argument("--fee", type=float, default=0.0005, help="每邊手續費（0.0005 = 0.05%%）")
+    ap.add_argument("--slip", type=float, default=0.0002)
+    ap.add_argument("--max-exposure", type=float, default=1.0, help="趨勢內總曝險上限（>1 = 槓桿，會計借貸成本）")
+    ap.add_argument("--borrow-rate", type=float, default=0.0, help="年化借貸成本，對曝險超過 1 的部分計息")
+    ap.add_argument("--vol-target", type=float, default=0.0)
+    ap.add_argument("--vol-lookback", type=int, default=20)
     ap.add_argument("--lag-stop", type=float, default=0.0)
     ap.add_argument("--lag-window", type=int, default=0)
     ap.add_argument("--lag-action", default="hold")
@@ -85,7 +91,9 @@ def main() -> int:
         singles[s] = r.equity
     warmup = max(warmups)
     rp = RiskParams(rebalance_threshold=args.rebalance_threshold, lag_stop=args.lag_stop, lag_window=args.lag_window,
-                    lag_action=args.lag_action, lag_resume=args.lag_resume, lag_resume_bars=args.lag_resume_bars)
+                    lag_action=args.lag_action, lag_resume=args.lag_resume, lag_resume_bars=args.lag_resume_bars,
+                    commission_pct=args.fee, slippage_pct=args.slip, max_exposure=args.max_exposure, borrow_rate_annual=args.borrow_rate,
+                    vol_target=args.vol_target, vol_lookback=args.vol_lookback)
     windows = parse_windows(args.windows)
 
     def run(rp_: RiskParams, fundings=None):
@@ -109,7 +117,7 @@ def main() -> int:
         single_avg[wname] = float(np.mean(vals)) if vals else None
 
     label = " + ".join(f"{s.split('/')[0]}×{vid}" for s, vid in zip(symbols, variant_ids))
-    lines = [f"=== 組合 {label} | 權重 {args.weights} | 起算 {res.equity.index[0].date()} | 調倉門檻 {args.rebalance_threshold}" + (f" | 運行閘門 lag_stop={args.lag_stop} window={args.lag_window} action={args.lag_action} resume={args.lag_resume}/{args.lag_resume_bars}" if args.lag_stop else ""),
+    lines = [f"=== 組合 {label} | 權重 {args.weights} | 起算 {res.equity.index[0].date()} | 調倉門檻 {args.rebalance_threshold} | 費 {args.fee:.3%}/邊 滑 {args.slip:.2%}" + (f" | 曝險上限 {args.max_exposure}× 借貸 {args.borrow_rate:.1%}/年" if args.max_exposure != 1.0 else "") + (f" | 波動目標 {args.vol_target}" if args.vol_target else "") + (f" | 運行閘門 lag_stop={args.lag_stop} window={args.lag_window} action={args.lag_action} resume={args.lag_resume}/{args.lag_resume_bars}" if args.lag_stop else ""),
              f"{'區間':6}{'':12}{'淨報酬':>9}{'回撤':>8}{'Sharpe':>8}{'Calmar':>8}{'相對落後':>9}{'閘門':>5}{'單標的平均Sharpe':>16}"]
     for wname, w in wm.items():
         s = w["strategy"]
@@ -118,7 +126,7 @@ def main() -> int:
             bs = b["summary"]
             lines.append(f"{'':6}{bname:12}{pct(bs['net_return']):>9}{pct(bs['max_dd']):>8}{num(bs['sharpe']):>8}{num(bs['calmar']):>8}{pct(b['rel_dd_vs_hold']):>9}{'✓' if b['gate']['passed'] else '✗':>5}")
     e = res.extra
-    lines.append(f"平均曝險 {e['avg_exposure']:.2f}（{', '.join(f'{k.split('/')[0]} {v:.2f}' for k, v in e['avg_exposure_by_asset'].items())}）| 在場 {e['time_in_market']:.0%} | 成交 {e['n_fills']}（名目換手 {e['notional_turnover_per_year']:.1f}×/年）| 回合 {len(res.round_trips)} | 落後閘門觸發 {e['lag_triggers']} | 相對持有最深落後 {pct(e['rel_dd_vs_hold'])}")
+    lines.append(f"平均曝險 {e['avg_exposure']:.2f}（{', '.join(f'{k.split('/')[0]} {v:.2f}' for k, v in e['avg_exposure_by_asset'].items())}，最高 {e.get('max_exposure_seen', 0):.2f}）| 在場 {e['time_in_market']:.0%} | 成交 {e['n_fills']}（名目換手 {e['notional_turnover_per_year']:.1f}×/年）| 回合 {len(res.round_trips)} | 落後閘門觸發 {e['lag_triggers']} | 相對持有最深落後 {pct(e['rel_dd_vs_hold'])}" + (f" | 借貸成本 {e['borrow_paid']:,.0f} | 最低權益 {e.get('min_equity', 0):,.0f}" if e.get("borrow_paid") else ""))
     if e["lag_events"]:
         lines.append("觸發：" + "; ".join(f"{ev['time']} lag {ev['lag'] * 100:.1f}% → {ev['action']}，{('恢復於 +' + str(ev['resume_bar'] - ev['trigger_bar']) + ' 根') if ev['resume_bar'] is not None else '未恢復'}" for ev in e["lag_events"]))
     report = {"label": label, "symbols": symbols, "variants": variant_ids, "weights": weights, "risk": dataclasses.asdict(rp) | {"funding": None},

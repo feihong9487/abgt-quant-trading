@@ -67,6 +67,7 @@ class RiskParams:
     lag_retrigger_cooldown: int = 0       # 恢復後 N 根內不得再觸發
     funding_rate_8h: float = 0.0
     funding: np.ndarray | None = field(default=None, repr=False, compare=False)
+    borrow_rate_annual: float = 0.0       # 槓桿借貸成本：每根對 max(0, 曝險 − 1) × 權益 計息（現貨保證金借 USDT 或永續資金費率之外的成本）
     exec_delay_bars: int = 0
     rebalance_threshold: float = 0.10
     initial_capital: float = 10_000.0
@@ -212,6 +213,7 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
     lag_events: list[dict] = []
     n_stop = n_pause = n_entries = n_exits = 0
     funding_paid = 0.0
+    borrow_paid = 0.0
     bh_qty = rp.initial_capital * (1 - rp.commission_pct) / c[start_idx]
 
     def fill_bar(i: int) -> int:
@@ -305,6 +307,13 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                 book.realized -= cost
                 funding_paid += cost
                 eqv = book.equity(c[i])
+            if rp.borrow_rate_annual > 0 and eqv > 0:
+                borrowed = max(0.0, pos * c[i] - eqv)
+                if borrowed > 0:
+                    cost = borrowed * rp.borrow_rate_annual / bars_per_year
+                    book.realized -= cost
+                    borrow_paid += cost
+                    eqv = book.equity(c[i])
         stop_hit_close = False
         if pos > 0 and rp.atr_stop_mult > 0 and not np.isnan(atr[i]):
             hi_close = c[i] if np.isnan(hi_close) else max(hi_close, c[i])
@@ -426,7 +435,9 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
     years = max(1e-9, (idx[-1] - idx[start_idx]).days / 365.25)
     extra = {
         "stops": n_stop, "dd_pauses": n_pause, "regime_entries": n_entries, "regime_exits": n_exits,
-        "n_fills": len(fills), "fills_by_reason": fills_by_reason, "funding_paid": funding_paid,
+        "n_fills": len(fills), "fills_by_reason": fills_by_reason, "funding_paid": funding_paid, "borrow_paid": borrow_paid,
+        "max_exposure_seen": float(np.nanmax(ex)) if len(ex) else 0.0,
+        "min_equity": float(np.nanmin(eq_s)) if len(eq_s) else 0.0,
         "notional_turnover": float(notional / np.nanmean(eq_s)) if np.nanmean(eq_s) > 0 else 0.0,
         "notional_turnover_per_year": float(notional / np.nanmean(eq_s) / years) if np.nanmean(eq_s) > 0 else 0.0,
         "avg_exposure": float(np.nanmean(ex)), "time_in_market": float(np.mean(ex > 0)),
