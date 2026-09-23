@@ -1,0 +1,8 @@
+[
+  {"round": 1, "run_id": "wf_458942fb-fbc", "started": "2026-09-23T16:40+08:00", "agents": 29, "duration_min": 43, "variants": 12, "verified": 4,
+   "champion": null, "note": "報告定 vol_atr_channel 為冠軍，事後 holdout（SOL/BNB）推翻；基準維持 ema50_plain", "report": "experiments/rounds/round_1.md"},
+  {"round": 2, "run_id": "wf_7cab963e-0fb", "started": "2026-09-23T18:19+08:00", "agents": 24, "duration_min": 44, "variants": 10, "verified": 2,
+   "champion": null, "note": "第 1 輪路線圖四個方向全部否定；引擎修 bug、加分級曝險與歷史資金費率", "report": "experiments/rounds/round_2.md"},
+  {"round": 3, "run_id": "wf_5169138d-f58", "started": "2026-09-23T20:12+08:00", "agents": null, "duration_min": null, "variants": 10, "verified": null,
+   "champion": null, "note": "進行中：情境自適應進場、BTC 領先閘、慢波動尺度帶寬、量能確認、分級曝險", "report": null}
+]
