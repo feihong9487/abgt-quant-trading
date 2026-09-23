@@ -1,0 +1,44 @@
+{
+  "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
+  "updated": "2026-09-23T17:25+08:00",
+  "round": 1,
+  "status": "round_1_workflow_running",
+  "workflow": {
+    "run_id": "wf_458942fb-fbc",
+    "script_path": "C:/Users/feihong/.claude/projects/C--Users-feihong/287fbefb-730e-4409-9cf4-4b83870f5428/workflows/scripts/abgt-optimize-round-wf_458942fb-fbc.js",
+    "resume_hint": "Workflow({scriptPath, resumeFromRunId: run_id}) 會沿用已完成代理的快取結果；先讀 transcript dir 的 journal.jsonl"
+  },
+  "baseline": {
+    "id": "ema50_plain",
+    "meanSharpe": 1.09,
+    "cells": {
+      "BTC_IS": {"sharpe": 1.01, "max_dd": -0.564, "net_return": 2.11, "gate": true},
+      "BTC_OOS": {"sharpe": 1.40, "max_dd": -0.303, "net_return": 3.87, "gate": true},
+      "BTC_FULL": {"sharpe": 1.17, "max_dd": -0.564, "net_return": 14.14, "gate": true},
+      "ETH_IS": {"sharpe": 1.26, "max_dd": -0.61, "net_return": 5.70, "gate": true},
+      "ETH_OOS": {"sharpe": 0.71, "max_dd": -0.513, "net_return": 1.22, "gate": true},
+      "ETH_FULL": {"sharpe": 0.99, "max_dd": -0.612, "net_return": 13.87, "gate": true}
+    }
+  },
+  "ledger": [
+    {"id": "ema50_plain", "note": "close>EMA50 滿倉；6/6 過閘門；基準"},
+    {"id": "ema50_atr", "note": "EMA50 + 3xATR 吊燈停損 + 停損後等趨勢重置；BTC IS 崩到 +5%；2/6"},
+    {"id": "turtle_55_20", "note": "Donchian 55/20 + 2xATR；回撤 -21% 但曝險 17%；4/6"},
+    {"id": "ema50_voltarget", "note": "EMA50 + 波動目標 60% + 停損 + 回撤暫停 25%；OOS 好 IS 差；1/6"}
+  ],
+  "rounds_without_champion": 0,
+  "stop_rule": "連續 3 輪沒有新 champion 就停止並推播回報",
+  "per_round_procedure": [
+    "1. 讀 experiments/rounds/round_N.md 與工作流回傳的 synthesis",
+    "2. champion != baseline → 複製變體到 abgt/strategies/ 正式化、更新 CLAUDE.md 第 5 節與本檔 baseline",
+    "3. 實作 synthesis.engine_proposals 裡合理的引擎改進（abgt/strategies/regime.py），保持向後相容",
+    "4. .venv/Scripts/python.exe tests/test_smoke.py 必須 7/7",
+    "5. git add -A && git commit（附 Co-Authored-By 行）",
+    "6. 把新變體加進 ledger、round+1、更新本檔，再用新 baseline/ledger 啟動下一輪 abgt-optimize-round 工作流（腳本同 script_path，args 換掉）"
+  ],
+  "resume_after_interruption": [
+    "若 status 是 *_workflow_running：先用 resumeFromRunId 續跑工作流，不要重開新的",
+    "若 status 是 integrating：檢查 git status，把未完成的第 2–6 步做完",
+    "若 status 是 idle_between_rounds：直接做第 6 步"
+  ]
+}
