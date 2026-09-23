@@ -39,7 +39,7 @@ os.chdir(ROOT)
 from abgt import data as dt                                                   # noqa: E402
 from abgt.portfolio import align, buy_and_hold_portfolio, simulate_portfolio  # noqa: E402
 from abgt.strategies.regime import RiskParams                                 # noqa: E402
-from evaluate_portfolio import window_metrics                                 # noqa: E402
+from evaluate_portfolio import fresh_benches, window_metrics                                 # noqa: E402
 from evaluate_variant import DATA_SINCE, load_variant, parse_windows          # noqa: E402
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT"]
@@ -139,8 +139,7 @@ def fmt(x, p=True):
 
 def main():
     dfs, idx, regimes, warm = load()
-    benches = {"持有不再平衡": buy_and_hold_portfolio(dfs, WEIGHTS, idx, warm, 10_000.0, BASE["commission_pct"], None),
-               "持有月再平衡": buy_and_hold_portfolio(dfs, WEIGHTS, idx, warm, 10_000.0, BASE["commission_pct"], "M")}
+    benches = fresh_benches(dfs, WEIGHTS, idx, 10_000.0, BASE["commission_pct"])     # 視窗起點重新等權買入
     rows = {}
     for cfg in configs():
         r = run_one(dfs, idx, regimes, warm, benches, cfg)

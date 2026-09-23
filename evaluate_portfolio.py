@@ -27,7 +27,17 @@ from abgt.strategies.regime import RiskParams, simulate_regime   # noqa: E402
 from evaluate_variant import DATA_SINCE, DEFAULT_WINDOWS, ALT_WINDOWS, STRESS, load_variant, parse_windows   # noqa: E402
 
 
-def window_metrics(eq: pd.Series, benches: dict[str, pd.Series], df_idx: pd.DatetimeIndex, windows, warmup: int, initial: float) -> dict:
+def fresh_benches(dfs: dict, weights: dict, idx: pd.DatetimeIndex, initial: float, fee: float):
+    """視窗起點重新等權買入的持有基準（不再平衡 / 月再平衡）。
+    舊版把起算日買入的持有切片重設基期，到 2023 已漂移成 ETH 七成以上的組合（levers.md §1.3、§3.6），報酬對比偏樂觀。"""
+    def fn(s0: int) -> dict[str, pd.Series]:
+        return {"持有不再平衡": buy_and_hold_portfolio(dfs, weights, idx, s0, initial, fee, None),
+                "持有月再平衡": buy_and_hold_portfolio(dfs, weights, idx, s0, initial, fee, "M")}
+    return fn
+
+
+def window_metrics(eq: pd.Series, benches, df_idx: pd.DatetimeIndex, windows, warmup: int, initial: float) -> dict:
+    """benches：dict（起算日買入、各視窗切片重設基期的舊口徑）或 callable(s0) → dict（視窗起點重新買入，建議）。"""
     out = {}
     for wname, wstart, wend in windows:
         s0 = max(warmup, int(df_idx.searchsorted(pd.Timestamp(wstart, tz="UTC"))))
@@ -38,7 +48,8 @@ def window_metrics(eq: pd.Series, benches: dict[str, pd.Series], df_idx: pd.Date
         e = e / e.iloc[0] * initial
         s = summarize(e)
         row = {"strategy": s, "bench": {}, "start": str(e.index[0].date()), "end": str(e.index[-1].date())}
-        for bname, b in benches.items():
+        wb = benches(s0) if callable(benches) else benches
+        for bname, b in wb.items():
             bb = b.loc[df_idx[s0]:df_idx[s1 - 1]]
             bb = bb / bb.iloc[0] * initial
             bs = summarize(bb)
@@ -102,8 +113,7 @@ def main() -> int:
 
     def run(rp_: RiskParams, fundings=None):
         res = simulate_portfolio(dfs, regimes, rp_, weights, warmup, fundings)
-        benches = {"持有不再平衡": buy_and_hold_portfolio(dfs, weights, idx, warmup, rp_.initial_capital, rp_.commission_pct, None),
-                   "持有月再平衡": buy_and_hold_portfolio(dfs, weights, idx, warmup, rp_.initial_capital, rp_.commission_pct, "M")}
+        benches = fresh_benches(dfs, weights, idx, rp_.initial_capital, rp_.commission_pct)
         return res, window_metrics(res.equity, benches, idx, windows, warmup, rp_.initial_capital)
 
     res, wm = run(rp)
