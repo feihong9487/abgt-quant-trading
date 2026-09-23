@@ -2,10 +2,10 @@
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
   "updated": "2026-09-23T19:05+08:00",
   "round": 2,
-  "status": "round_2_workflow_pending_launch",
+  "status": "round_2_workflow_running",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
-    "run_id": null,
+    "run_id": "wf_7cab963e-0fb",
     "previous_runs": [{"round": 1, "run_id": "wf_458942fb-fbc", "report": "experiments/rounds/round_1.md"}],
     "resume_hint": "Workflow({scriptPath, resumeFromRunId: run_id, args}) 會沿用已完成代理的快取結果；先讀 transcript dir 的 journal.jsonl"
   },
