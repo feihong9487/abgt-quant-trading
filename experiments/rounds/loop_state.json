@@ -2,7 +2,7 @@
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
   "updated": "2026-09-23T21:20+08:00",
   "round": 4,
-  "status": "levers_workflow_running",
+  "status": "levers_done_executor_waiting_keys",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
     "run_id": null,
@@ -398,9 +398,10 @@
     "paper_forward": "引擎 lag_stop=0；每日記錄份額法 NAV 對上線日持有的比值、比值高水位回撤、90/180/365 根滾動比值、策略絕對回撤；累積 ≥ 6 個月後以 cohort 分布再議 X；動作只能是通知/人工覆核"
   },
   "next_steps": [
-    "等 levers 工作流完成 → 讀 experiments/rounds/levers.md，整合 CLAUDE.md / dashboard，commit + push",
-    "使用者提供測試網金鑰後：executor init → run（maker-first 60）→ 加入 run_daily.bat",
-    "槓桿：不在真錢啟用；若要，只在紙上前向 ≥ 6 個月且持有風險層政策仍通過時討論"
+    "costs 驗證完成 → 若有修正寫進 levers.md §2，commit + push",
+    "使用者提供測試網金鑰（ABGT/.env）→ executor init → run --maker-first 60 → 加入 run_daily.bat",
+    "開 4×25% 記錄型紙上分帳（上線 2026-10-01）",
+    "槓桿：前向 ≥ 12 個月前不討論"
   ],
   "levers": {
     "workflow_run_id": "wf_dce40c49-2c7",
@@ -412,6 +413,10 @@
       "finding": "槓桿只沿資本市場線移動：OOS Sharpe 全網格 1.03–1.18、1× 為 1.10；同風險層（回撤不深於 1× 2pp）兩個切分都驗證失敗；持有風險層兩切分都選 x2.0_vt0.9_ddl0.15，驗證通過（OOS CAGR 55.9% vs 37.9%、回撤 −54.5% vs −37.6%、Sharpe 1.10 = 1.10），鄰居 2/5 可行、零強平、最低保證金率 1.89；redeploy_idle 全面變差"
     },
     "executor": "live/executor.py（測試網；等使用者在 ABGT/.env 放 BINANCE_TESTNET_KEY/SECRET 後 init + 排程）",
-    "github": "https://github.com/feihong9487/abgt-quant-trading (private)"
+    "github": "https://github.com/feihong9487/abgt-quant-trading (private)",
+    "synthesis": "experiments/rounds/levers.md",
+    "decision": "現在 1×、不借錢、不掛波動目標；重開條件 levers.md §5.3",
+    "benchmark_fix": "evaluate_portfolio 持有改視窗起點重設（fresh_benches）；十格仍全過；OOS 絕對報酬 +231% vs 持有 +274%",
+    "costs_verify": "驗證代理進行中（results/levers/costs_verify.py）"
   }
 }
