@@ -2,10 +2,10 @@
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
   "updated": "2026-09-23T20:45+08:00",
   "round": 4,
-  "status": "round_4_workflow_pending_launch",
+  "status": "round_4_workflow_running",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
-    "run_id": null,
+    "run_id": "wf_935e3ba6-648",
     "previous_runs": [
       {
         "round": 1,
