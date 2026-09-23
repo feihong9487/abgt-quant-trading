@@ -74,7 +74,8 @@ def run_once(df: pd.DataFrame, mod, params: dict, windows, risk_override: dict |
     if risk_override:
         rp = dataclasses.replace(rp, **risk_override)
     res = simulate_regime(df, in_regime, rp, warmup)
-    extra = {k: v for k, v in res.extra.items() if k != "stop_events"}
+    skip = {"stop_events", "rel_log_vs_hold", "bench_equity", "lag_events"}
+    extra = {k: v for k, v in res.extra.items() if k not in skip}
     extra["n_stop_events"] = len(res.extra.get("stop_events", []))
     out = {"windows": {}, "extra": extra, "regime_key": regime_key(in_regime), "exposure_key": res.extra["exposure_key"],
            "warmup": warmup, "equity": res.equity}
@@ -90,7 +91,10 @@ def run_once(df: pd.DataFrame, mod, params: dict, windows, risk_override: dict |
         rt = res.round_trips[(res.round_trips.end_time >= df.index[s0]) & (res.round_trips.end_time <= df.index[s1 - 1])]
         s, b = summarize(eq, tr, rt), summarize(bh)
         g = gate(s, b, segment_table(eq, bh), mode="risk")
-        out["windows"][wname] = {"strategy": s, "buy_and_hold": b, "gate": g, "start": str(eq.index[0].date()), "end": str(eq.index[-1].date())}
+        ratio = (eq / bh.reindex(eq.index)).to_numpy()
+        rel_dd = float(np.nanmin(ratio / np.maximum.accumulate(ratio) - 1)) if len(ratio) else 0.0
+        out["windows"][wname] = {"strategy": s, "buy_and_hold": b, "gate": g, "start": str(eq.index[0].date()), "end": str(eq.index[-1].date()),
+                                 "rel_dd_vs_hold": rel_dd, "rel_final_vs_hold": float(ratio[-1] / ratio[0] - 1) if len(ratio) else 0.0}
     return out
 
 
@@ -167,17 +171,17 @@ def stress(df: pd.DataFrame, mod, params: dict, windows, funding: pd.Series | No
 
 def fmt_windows(sym: str, r: dict, cmp_: dict | None) -> str:
     lines = [f"--- {sym} ---",
-             f"{'區間':6}{'':6}{'淨報酬':>9}{'回撤':>8}{'CAGR':>8}{'Sharpe':>8}{'Calmar':>8}{'回合':>5}{'閘門':>5}" + (f"{'ΔSharpe':>9}{'Δ回撤':>8}{'t':>7}" if cmp_ else "")]
+             f"{'區間':6}{'':6}{'淨報酬':>9}{'回撤':>8}{'CAGR':>8}{'Sharpe':>8}{'Calmar':>8}{'回合':>5}{'閘門':>5}{'相對落後':>9}" + (f"{'ΔSharpe':>9}{'Δ回撤':>8}{'t':>7}" if cmp_ else "")]
     for wname, w in r["windows"].items():
         s, b, g = w["strategy"], w["buy_and_hold"], w["gate"]
         extra = ""
         if cmp_ and wname in cmp_:
             cc = cmp_[wname]
             extra = f"{cc['d_sharpe']:>+9.2f}{cc['d_max_dd'] * 100:>+7.1f}%{num(cc['t_daily']):>7}"
-        lines.append(f"{wname:6}{'策略':6}{pct(s['net_return']):>9}{pct(s['max_dd']):>8}{pct(s['cagr']):>8}{num(s['sharpe']):>8}{num(s['calmar']):>8}{s.get('round_trips', 0):>5}{'✓' if g['passed'] else '✗':>5}{extra}")
+        lines.append(f"{wname:6}{'策略':6}{pct(s['net_return']):>9}{pct(s['max_dd']):>8}{pct(s['cagr']):>8}{num(s['sharpe']):>8}{num(s['calmar']):>8}{s.get('round_trips', 0):>5}{'✓' if g['passed'] else '✗':>5}{pct(w.get('rel_dd_vs_hold')):>9}{extra}")
         lines.append(f"{'':6}{'持有':6}{pct(b['net_return']):>9}{pct(b['max_dd']):>8}{pct(b['cagr']):>8}{num(b['sharpe']):>8}{num(b['calmar']):>8}")
     e = r["extra"]
-    lines.append(f"平均曝險 {e['avg_exposure']:.2f}（趨勢內 {e.get('avg_exposure_in_regime', 0):.2f}，部分曝險 {e.get('partial_days', 0)} 天）| 在場 {e['time_in_market']:.0%} | 進/出 {e.get('regime_entries', 0)}/{e.get('regime_exits', 0)} | 成交 {e.get('n_fills', 0)} | ATR 停損 {e['stops']} | 回撤暫停 {e['dd_pauses']}" + (f" | 資金費率 {e['funding_paid']:.0f}" if e.get("funding_paid") else ""))
+    lines.append(f"平均曝險 {e['avg_exposure']:.2f}（趨勢內 {e.get('avg_exposure_in_regime', 0):.2f}，部分曝險 {e.get('partial_days', 0)} 天）| 在場 {e['time_in_market']:.0%} | 進/出 {e.get('regime_entries', 0)}/{e.get('regime_exits', 0)} | 成交 {e.get('n_fills', 0)}（名目換手 {e.get('notional_turnover_per_year', 0):.1f}×/年）| ATR 停損 {e['stops']} | 回撤暫停 {e['dd_pauses']} | 落後閘門觸發 {e.get('lag_triggers', 0)}" + (f" | 資金費率 {e['funding_paid']:.0f}" if e.get("funding_paid") else ""))
     return "\n".join(lines)
 
 

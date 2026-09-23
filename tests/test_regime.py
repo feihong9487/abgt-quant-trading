@@ -186,6 +186,38 @@ def test_funding_array_income_and_cost():
     assert r_income.extra["funding_paid"] < 0 < r_cost.extra["funding_paid"]
 
 
+def test_scale_ratchet_and_floor():
+    """P2：ratchet_up 趨勢內只升不降；scale_floor 是趨勢內曝險下限。"""
+    df, on = _flag_df()
+    scale = np.where(on, 0.5, np.nan)
+    scale[70:90] = 1.0      # 趨勢內先升到 1.0，之後 scale 回到 0.5
+    r_track = simulate_regime(df, {"in_regime": on, "scale": scale}, RiskParams(rebalance_threshold=0.1), 10)
+    r_ratch = simulate_regime(df, {"in_regime": on, "scale": scale}, RiskParams(rebalance_threshold=0.1, scale_mode="ratchet_up"), 10)
+    assert r_track.extra["scale_downs"] >= 1 and r_ratch.extra["scale_downs"] == 0
+    assert r_ratch.extra["avg_exposure_in_regime"] > r_track.extra["avg_exposure_in_regime"]
+    r_floor = simulate_regime(df, {"in_regime": on, "scale": np.where(on, 0.2, np.nan)}, RiskParams(scale_floor=0.6), 10)
+    ex_in = r_floor.extra["avg_exposure_in_regime"]
+    assert 0.55 < ex_in < 0.7, ex_in
+
+
+def test_lag_stop_hold_and_flat():
+    """P1：策略相對同起點持有落後 ≥ X 時觸發運行閘門；hold 轉 100% 持有、flat 空手；bars 恢復。"""
+    df = synthetic_ohlcv(400, "1D", seed=21, drift=0.004)   # 強勢上漲：趨勢外空手的策略必落後持有
+    on = np.zeros(400, dtype=bool)
+    on[30:60] = True                                       # 之後長期空手 → 落後累積
+    base = simulate_regime(df, on, RiskParams(), 10)
+    hold = simulate_regime(df, on, RiskParams(lag_stop=0.10, lag_action="hold", lag_resume="bars", lag_resume_bars=40), 10)
+    flat = simulate_regime(df, on, RiskParams(lag_stop=0.10, lag_action="flat", lag_resume="bars", lag_resume_bars=40), 10)
+    assert base.extra["lag_triggers"] == 0 and hold.extra["lag_triggers"] >= 1
+    assert hold.extra["rel_dd_vs_hold"] > base.extra["rel_dd_vs_hold"]          # hold 版相對持有的最深落後較淺
+    assert hold.equity.iloc[-1] > base.equity.iloc[-1]                          # 上漲市場裡轉持有賺回來
+    ev = hold.extra["lag_events"][0]
+    assert ev["resume_bar"] is None or ev["resume_bar"] - ev["trigger_bar"] >= 40
+    assert flat.extra["lag_triggers"] >= 1 and "落後閘門持有" in hold.extra["fills_by_reason"]
+    assert flat.extra["fills_by_reason"].get("落後閘門持有", 0) == 0
+    assert abs(hold.extra["rel_log_vs_hold"].sum() - (np.log(hold.equity.iloc[-1] / hold.equity.iloc[0]) - np.log(df["close"].iloc[-1] / df["close"].iloc[10]))) < 1e-6
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

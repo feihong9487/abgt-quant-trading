@@ -1,8 +1,8 @@
 {
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
-  "updated": "2026-09-23T20:20+08:00",
-  "round": 3,
-  "status": "stopped_rule_3_rounds_without_champion",
+  "updated": "2026-09-23T20:45+08:00",
+  "round": 4,
+  "status": "round_4_workflow_pending_launch",
   "workflow": {
     "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
     "run_id": null,
@@ -233,8 +233,8 @@
       "note": "EMA 35/50/70 三級曝險；BTC ema_len 敏感度帶寬壓到 0.15–0.31×，ETH 反放大；成交 2.1× 讓高費情境翻掉"
     }
   ],
-  "rounds_without_champion": 3,
-  "stop_rule": "連續 3 輪沒有新 champion 就停止並推播回報",
+  "rounds_without_champion": 0,
+  "stop_rule": "第 4 輪起重新計數：連續 3 輪沒有新 champion 就停止並回報（使用者 2026-09-23 指示重開：a 分級曝險 A3 正式化 + b 運行閘門，之後跑 c 組合）",
   "directions_round_3": [
     {
       "key": "context_adaptive_entry",
@@ -272,7 +272,10 @@
     "7. python build_dashboard.py 重建 dashboard/index.html 並用 Artifact 工具重新發佈到同一個 URL"
   ],
   "resume_after_interruption": [
-    "迴圈已依停止規則結束；重開需使用者指示，起點為 candidate_directions_round_4，且先實作 engine_proposals_pending 的 P1/P2，取代門檻改用 acceptance_rule_note"
+    "若 status 是 *_workflow_running：先用 resumeFromRunId 續跑工作流，不要重開新的",
+    "若 status 是 *_pending_launch：用 Workflow({scriptPath, args:{round, baseline, ledger, directions: directions_round_4, accept}}) 啟動",
+    "若 status 是 integrating：檢查 git status，把未完成的步驟做完",
+    "第 4 輪後：做 c（引擎 P4 simulate_portfolio + BTC/ETH 50/50），然後 live/ 現貨紙上前向測試"
   ],
   "candidate_directions_round_4": [
     {
@@ -302,5 +305,26 @@
     "P3 fills_by_reason / notional_turnover / rounds / rel_log_vs_hold",
     "P4 simulate_portfolio 雙標的組合"
   ],
-  "acceptance_rule_note": "第 3 輪安慰劑檢定：25% 的隨機進場濾網滿足「十格全過 + 六格平均 > 冠軍 + 四 OOS Δ ≥ -0.05」；若重開迴圈，取代門檻改為「四個 OOS 格對冠軍 ΔSharpe 平均 ≥ +0.05 且至少一格 |t| ≥ 1.5 且 holdout 平均 Δ ≥ 0」"
+  "acceptance_rule_note": "第 3 輪安慰劑檢定：25% 的隨機進場濾網滿足「十格全過 + 六格平均 > 冠軍 + 四 OOS Δ ≥ -0.05」；若重開迴圈，取代門檻改為「四個 OOS 格對冠軍 ΔSharpe 平均 ≥ +0.05 且至少一格 |t| ≥ 1.5 且 holdout 平均 Δ ≥ 0」",
+  "directions_round_4": [
+    {
+      "key": "graded_exposure_ema_exit",
+      "kind": "strategy",
+      "n": 2,
+      "prompt": "分級曝險正式化。變體 A（第 3 輪消融 A3 原樣，參數不得改）：enter = close > EMA50、scale 由距離 d=(close−EMA50)/ATR14 決定 —— d<0.5 → 0.5、0.5≤d<1.0 → 0.75、d≥1.0 → 1.0，趨勢內只升不降（用引擎 RiskParams(scale_mode=\"ratchet_up\") 或自己遞推，兩者要逐位相同），exit = close < EMA50 全出，rebalance_threshold 0.15，其餘風控預設；regime 逐位等於 ema50_plain、只改倉位。已知數字（不得當作調參依據）：十格全過、六格 1.148、四 OOS Δ −0.040/−0.043/+0.029/+0.103、holdout SOL 5/5 +0.083 / BNB 3/5 +0.018。變體 B（graded_exit_clip_ema50，2×2 缺格）：進場二元滿倉，趨勢內依 d 降級（d<0.5 → 0.5，否則 1.0，無棘輪、可升回），出場 close < EMA50，rebalance 0.15；0.5 這兩個數字事前登記不得調。事前判準（兩變體共用，比舊門檻嚴）：十格全過、四 OOS Δ ≥ −0.05、去前 3 個差異段後四 OOS Δ ≥ −0.05 且至少一格 |t| ≥ 1、六格平均與四 OOS Δ 平均都高於安慰劑（scale 級別隨機置換 ≥ 100 次）第 90 百分位、分標的 holdout 平均 Δ ≥ −0.05 且冠軍過閘格不翻掛、費 0.10%+滑 0.20% 十格過、延遲一根四 OOS ≥ 3、成交 ≤ 基準回合 1.6×。若 overfit 審查再判「增量全在 IS」，graded_exposure 方向整個關閉。取代冠軍走風險路徑（四 OOS 回撤全淺 ≥ 3pp 且 Δ 平均 ≥ −0.02）或 Sharpe 路徑。"
+    },
+    {
+      "key": "running_gate_lag_stop",
+      "kind": "guard",
+      "n": 2,
+      "prompt": "為 ema50_plain 設計運行閘門（不是新策略；用引擎 RiskParams.lag_stop / lag_window / lag_action / lag_resume / lag_resume_bars，變體檔的 build 回傳 ema50_plain 的 in_regime 加上這些 RiskParams）。背景：基準相對同起點持有的最深落後（評估器新欄位「相對落後」）BTC IS −61.6%、OOS −41.9% —— 落後主要發生在牛市裡趨勢外空手的期間，所以 X 太小會在每個牛市被觸發、觸發後 hold 又可能買在半山腰。先做分析：用 extra.rel_log_vs_hold 與 rel_dd_vs_hold 算冠軍在十格 + holdout 的相對落後分布（累計自起算、以及 90/180/365 根滾動），印出落後超過 10/15/20/30% 的次數、持續根數與發生時點。然後事前登記兩組參數（例如 A：lag_window=0 累計、lag_stop=0.20、lag_action=hold、lag_resume=ratio_high、lag_resume_bars=60；B：lag_window=180 滾動、lag_stop=0.15、lag_action=hold、lag_resume=bars、lag_resume_bars=60；也可各配一個 flat 對照）後回測十格。事前判準：IS 誤觸發 ≤ 1 次/年、觸發後十格 Sharpe ≥ plain − 0.02 且閘門不得把任何一格由過翻掛、最壞相對落後（rel_dd_vs_hold）被鎖在 −(X + 成本) 附近且比 plain 淺、對 vol_atr_channel 與 holdout SOL/BNB 同規則成立、費 0.10%+滑 0.20% 與歷史資金費率下結論不變。回報每次觸發的時點、lag、動作、恢復根數與該段對持有的相對表現。結論形式：建議採用的參數組（或不採用）與理由。"
+    }
+  ],
+  "accept": {
+    "oos_avg_delta": 0.05,
+    "t_min": 1.5,
+    "oos_min_delta": -0.05,
+    "risk_path_dd_pp": 0.03,
+    "holdout_avg_delta": 0.0
+  }
 }

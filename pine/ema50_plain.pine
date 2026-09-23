@@ -1,0 +1,94 @@
+//@version=6
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  ABGT ema50_plain — 曝險型趨勢跟隨（三輪優化迴圈的現任冠軍）                ║
+// ║                                                                          ║
+// ║  規則：收盤 > EMA50 → 下一根開盤 100% 做多；收盤 < EMA50 → 下一根開盤全出   ║
+// ║  只做多、無停損、無波動目標。Python 版：ABGT/experiments/variants/ema50_plain.py ║
+// ║  回測口徑：BTC/USDT 日線 2020-01 → 2026-09 淨報酬 +1414%（持有 +1097%），   ║
+// ║  最大回撤 −56%（持有 −77%），Sharpe 1.17（持有 0.92）；手續費 0.05%/邊     ║
+// ║  上線口徑：現貨（永續資金費率會把 ETH 的優勢吃光）                          ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+strategy("ABGT ema50_plain", "ema50", overlay = true,
+     initial_capital = 10000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 100,
+     commission_type = strategy.commission.percent, commission_value = 0.05,
+     slippage = 2, pyramiding = 0,
+     calc_on_every_tick = false, process_orders_on_close = false)
+
+// === 參數（與 Python 版同名同值；ema_len 是唯一脆弱參數，三輪敏感度都指向它，固定 50 視為結構常數）===
+emaLen     = input.int(50, "EMA 長度", minval = 5, group = "策略")
+showBH     = input.bool(true, "顯示買入持有對照", group = "顯示")
+showTable  = input.bool(true, "顯示統計面板", group = "顯示")
+showRegime = input.bool(true, "趨勢背景", group = "顯示")
+oosStart   = input.time(timestamp("2023-01-01T00:00:00+0000"), "OOS 起點（背景分界）", group = "顯示")
+
+// === 訊號：只看收盤 ===
+ema50   = ta.ema(close, emaLen)
+inTrend = close > ema50
+enterSig = inTrend and not inTrend[1]
+exitSig  = not inTrend and inTrend[1]
+
+// === 執行：process_orders_on_close=false → 下一根開盤成交，與 Python 版一致 ===
+if enterSig and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, comment = "EMA50 上")
+if exitSig and strategy.position_size > 0
+    strategy.close("Long", comment = "EMA50 下")
+
+// === 買入持有對照（從圖表第一根起算，與策略同資金）===
+var float bhQty = na
+if na(bhQty)
+    bhQty := strategy.initial_capital / close
+bhEquity = bhQty * close
+
+// === 相對持有的落後（運行閘門的觀察量：策略權益 / 持有權益 − 1）===
+relLag = strategy.equity / bhEquity - 1
+var float relPeak = 1.0
+ratio = strategy.equity / bhEquity
+relPeak := math.max(relPeak, ratio)
+relDD = ratio / relPeak - 1
+
+// === 繪圖 ===
+plot(ema50, "EMA50", color = inTrend ? color.new(#3987e5, 0) : color.new(#d95926, 0), linewidth = 2)
+bgcolor(showRegime and inTrend ? color.new(#3987e5, 92) : na, title = "趨勢內")
+bgcolor(showRegime and time >= oosStart ? color.new(#d95926, 96) : na, title = "OOS 區")
+plotshape(enterSig, "進場", shape.triangleup, location.belowbar, color.new(#10b981, 0), size = size.small, text = "L")
+plotshape(exitSig, "出場", shape.triangledown, location.abovebar, color.new(#ef4444, 0), size = size.small, text = "X")
+
+// === 統計面板 ===
+if showTable and barstate.islast
+    var table t = table.new(position.top_right, 2, 9, bgcolor = color.new(#121216, 10), border_color = color.new(#33333b, 0), border_width = 1)
+    W = color.white
+    G = color.new(#10b981, 60)
+    R = color.new(#ef4444, 60)
+    N = color.new(#26262d, 0)
+    sz = size.small
+    netPct = strategy.netprofit / strategy.initial_capital * 100
+    bhPct  = (bhEquity / strategy.initial_capital - 1) * 100
+    wr = strategy.closedtrades > 0 ? strategy.wintrades / strategy.closedtrades * 100.0 : 0.0
+    pf = strategy.grossloss != 0 ? math.abs(strategy.grossprofit / strategy.grossloss) : 0.0
+    table.cell(t, 0, 0, "ABGT ema50_plain", text_color = W, bgcolor = color.new(#0C5CAB, 0), text_size = sz)
+    table.cell(t, 1, 0, syminfo.ticker + " " + timeframe.period, text_color = W, bgcolor = color.new(#0C5CAB, 0), text_size = sz)
+    table.cell(t, 0, 1, "淨報酬", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 1, str.tostring(netPct, "#.#") + "%", text_color = W, bgcolor = netPct >= bhPct ? G : R, text_size = sz)
+    table.cell(t, 0, 2, "買入持有", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 2, str.tostring(bhPct, "#.#") + "%", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 0, 3, "最大回撤", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 3, str.tostring(strategy.max_drawdown_percent, "#.#") + "%", text_color = W, bgcolor = strategy.max_drawdown_percent <= 60 ? G : R, text_size = sz)
+    table.cell(t, 0, 4, "相對持有落後", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 4, str.tostring(relLag * 100, "#.#") + "%（自高點 " + str.tostring(relDD * 100, "#.#") + "%）", text_color = W, bgcolor = relDD > -0.10 ? G : R, text_size = sz)
+    table.cell(t, 0, 5, "回合 / 勝率", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 5, str.tostring(strategy.closedtrades) + " / " + str.tostring(wr, "#.#") + "%", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 0, 6, "獲利因子", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 6, str.tostring(pf, "#.##"), text_color = W, bgcolor = pf >= 1.5 ? G : R, text_size = sz)
+    table.cell(t, 0, 7, "狀態", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 7, inTrend ? "趨勢內（持有）" : "趨勢外（空手）", text_color = W, bgcolor = inTrend ? G : R, text_size = sz)
+    table.cell(t, 0, 8, "距 EMA50", text_color = W, bgcolor = N, text_size = sz)
+    table.cell(t, 1, 8, str.tostring((close / ema50 - 1) * 100, "#.##") + "%", text_color = W, bgcolor = N, text_size = sz)
+
+// === 警報（strategy 用 alert()，建立警報時選「任何 alert() 函式呼叫」）===
+if enterSig
+    alert("ABGT ema50_plain ▲ 進場 " + syminfo.ticker + " close=" + str.tostring(close, "#.##") + " ema50=" + str.tostring(ema50, "#.##"), alert.freq_once_per_bar_close)
+if exitSig
+    alert("ABGT ema50_plain ▼ 出場 " + syminfo.ticker + " close=" + str.tostring(close, "#.##") + " ema50=" + str.tostring(ema50, "#.##"), alert.freq_once_per_bar_close)
+if relDD <= -0.10 and relDD[1] > -0.10
+    alert("ABGT ema50_plain ⚠ 相對持有落後 10%（運行閘門觀察量）" + syminfo.ticker, alert.freq_once_per_bar_close)
