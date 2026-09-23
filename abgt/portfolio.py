@@ -3,7 +3,11 @@
 支援的 RiskParams 欄位：max_exposure、rebalance_threshold、exec_delay_bars、commission_pct、slippage_pct、
 funding_rate_8h / funding（每標的一個陣列，用 fundings dict）、dd_pause 系列（組合層）、
 lag_stop 系列（組合層，基準 = 同權重買入持有不再平衡）。scale 陣列只支援 track 模式。
-不支援：波動目標、ATR 停損、重進規則（這些是單標的語意，組合層要先證明有必要再加）。
+vol_target（absolute、total）：每個標的各自 min(1, vol_target / (rvol × 曝險上限)) 縮放；
+redeploy_idle：趨勢外標的的權重分給趨勢內標的（只有 BTC 在趨勢時 BTC 拿 100%），總曝險仍 ≤ max_exposure。
+槓桿風控：borrow_rate_annual（對 max(0, −現金) 計息）、liq_level / liq_penalty（全倉強平：保證金率 = 部位市值 / 借款，
+各標的從開盤沿直線走到最低價、找出組合保證金率觸及 liq_level 的那一點全部賣出，保守）、dd_lever_full（回撤降槓桿，語意同單標的）。
+不支援：ATR 停損、重進規則（這些是單標的語意，組合層要先證明有必要再加）。
 
 執行語意與單標的引擎相同：收盤判定、下一根（+ 延遲）開盤成交、每邊手續費、只做多。
 """
@@ -16,6 +20,9 @@ import pandas as pd
 
 from .broker import BacktestResult
 from .strategies.regime import RiskParams, regime_flags
+
+
+BORROW_TOL = 0.005    # 手續費造成的 ≤ 0.5% 權益透支不算借款（真實現貨帳戶會把買量縮一點，不會真的借）
 
 
 def align(dfs: dict[str, pd.DataFrame]) -> pd.DatetimeIndex:
@@ -56,6 +63,7 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
     keys = list(dfs)
     n = len(idx)
     o = {k: dfs[k]["open"].reindex(idx).to_numpy(dtype="float64") for k in keys}
+    lo = {k: dfs[k]["low"].reindex(idx).to_numpy(dtype="float64") for k in keys}
     c = {k: dfs[k]["close"].reindex(idx).to_numpy(dtype="float64") for k in keys}
     on, scale = {}, {}
     for k in keys:
@@ -88,22 +96,36 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
     notional = 0.0
     n_pause = 0
     bars_per_year = 365.0 * 86400.0 / pd.Series(idx).diff().dropna().median().total_seconds()
+    rvol = {}
+    if rp.vol_target > 0:
+        for k in keys:
+            r = np.log(pd.Series(c[k]) / pd.Series(c[k]).shift(1))
+            rvol[k] = (r.rolling(rp.vol_lookback).std() * np.sqrt(bars_per_year)).to_numpy()
+    liq_block = {k: False for k in keys}
+    liq_events: list[dict] = []
+    min_margin_level = np.inf
 
     def fill_bar(i: int) -> int:
         return i + 1 + rp.exec_delay_bars
 
     for i in range(start_idx, n):
         t = idx[i]
-        # 1) 到期目標在開盤成交（每標的各自）
+        # 1) 到期目標在開盤成交：先賣後買；不借錢模式（max_exposure ≤ 1）買量以現金為上限（現貨帳戶不能透支）
+        todo = []
         for k in keys:
             due = [p for p in pending[k] if p[0] <= i]
             if not due:
                 continue
             pending[k] = [p for p in pending[k] if p[0] > i]
-            _, target, reason = due[-1]
+            todo.append((k, due[-1][1], due[-1][2]))
+        eq_open0 = cash + sum(qty[j] * o[j][i] for j in keys)
+        todo.sort(key=lambda x: x[1] * eq_open0 / o[x[0]][i] - qty[x[0]] > 0)      # 賣單在前
+        for k, target, reason in todo:
             eq_open = cash + sum(qty[j] * o[j][i] for j in keys)
             target_qty = target * eq_open / o[k][i]
             diff = target_qty - qty[k]
+            if diff > 0 and rp.max_exposure <= 1.0:
+                diff = min(diff, max(0.0, cash) / (o[k][i] * (1 + rp.slippage_pct) * (1 + rp.commission_pct)))
             if abs(diff) * o[k][i] < 1e-6 * eq_open:
                 continue
             if diff > 0:
@@ -128,6 +150,34 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
                         trip_open[k] = None
             notional += abs(diff) * px
             fills.append({"asset": k, "time": t, "side": 1 if diff > 0 else -1, "qty": abs(diff), "price": px, "reason": reason})
+        # 1b) 全倉保證金率與強平：借款 D = max(0, −現金)，與價格無關
+        debt = -cash
+        if debt > 1e-9 and any(qty[k] > 0 for k in keys):
+            v_open = sum(qty[k] * o[k][i] for k in keys)
+            v_low = sum(qty[k] * lo[k][i] for k in keys)
+            min_margin_level = min(min_margin_level, v_low / debt)
+            if rp.liq_level > 0 and v_low <= rp.liq_level * debt:
+                lam = 0.0 if v_open <= rp.liq_level * debt else (v_open - rp.liq_level * debt) / max(1e-12, v_open - v_low)
+                proceeds_total = 0.0
+                for k in keys:
+                    if qty[k] <= 0:
+                        continue
+                    px = (o[k][i] - lam * (o[k][i] - lo[k][i])) * (1 - rp.liq_penalty)
+                    proceeds = qty[k] * px
+                    cash += proceeds * (1 - rp.commission_pct)
+                    proceeds_total += proceeds
+                    notional += qty[k] * px
+                    fills.append({"asset": k, "time": t, "side": -1, "qty": qty[k], "price": px, "reason": "強平"})
+                    tr = trip_open[k]
+                    if tr:
+                        trips.append({**{x: tr[x] for x in ("asset", "start_time", "start_bar", "entry_px", "n_entries")},
+                                      "end_time": t, "exit_px": px, "bars": i - tr["start_bar"], "log_ret": float(np.log(px / tr["entry_px"])), "last_reason": "強平"})
+                        trip_open[k] = None
+                    qty[k] = 0.0
+                    pending[k] = []
+                    liq_block[k] = True
+                liq_events.append({"bar": i, "time": str(t.date()), "margin_level_low": float(v_low / debt), "lambda": float(lam),
+                                   "equity_after": float(cash)})
         # 2) 收盤：資金費率、權益、回撤、運行閘門、目標曝險
         for k in keys:
             if qty[k] > 0:
@@ -138,7 +188,7 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
                     funding_paid += cost
         eqv = cash + sum(qty[k] * c[k][i] for k in keys)
         if rp.borrow_rate_annual > 0 and eqv > 0:
-            borrowed = max(0.0, sum(qty[k] * c[k][i] for k in keys) - eqv)
+            borrowed = max(0.0, sum(qty[k] * c[k][i] for k in keys) - eqv * (1 + BORROW_TOL))
             if borrowed > 0:
                 cost = borrowed * rp.borrow_rate_annual / bars_per_year
                 cash -= cost
@@ -181,14 +231,24 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
                 if lag <= -rp.lag_stop:
                     lag_mode, lag_bar = True, i
                     lag_events.append({"trigger_bar": i, "time": str(t.date()), "lag": float(lag), "resume_bar": None, "action": rp.lag_action})
+        cap = rp.max_exposure
+        if rp.dd_lever_full > 0 and cap > 1.0:
+            cap = 1.0 + (cap - 1.0) * max(0.0, 1.0 - dd / rp.dd_lever_full)
         for k in keys:
-            want = on[k][i] and not paused
+            if not on[k][i]:
+                liq_block[k] = False            # 強平後等該標的趨勢重置才准重進
+        w_on = sum(weights[k] for k in keys if on[k][i] and not liq_block[k])
+        for k in keys:
+            want = on[k][i] and not paused and not liq_block[k] and eqv > 0
             target = 0.0
             if want:
                 s = 1.0
                 if scale[k] is not None and scale[k][i] == scale[k][i]:
                     s = float(np.clip(scale[k][i], 0.0, 1.0))
-                target = weights[k] * rp.max_exposure * s
+                if rp.vol_target > 0 and rvol[k][i] == rvol[k][i] and rvol[k][i] > 0:
+                    s *= min(1.0, rp.vol_target / (rvol[k][i] * cap))
+                w_eff = weights[k] / w_on if (rp.redeploy_idle and w_on > 0) else weights[k]
+                target = w_eff * cap * s
             if lag_mode:
                 target = weights[k] * rp.max_exposure if rp.lag_action == "hold" else 0.0
             current = qty[k] * c[k][i] / eqv if eqv > 0 else 0.0
@@ -222,8 +282,11 @@ def simulate_portfolio(dfs: dict[str, pd.DataFrame], regimes: dict, rp: RiskPara
         "min_equity": float(np.nanmin(eq_s)) if len(eq_s) else 0.0,
         "notional_turnover_per_year": float(notional / np.nanmean(eq_s) / years) if np.nanmean(eq_s) > 0 else 0.0,
         "avg_exposure": float(np.nanmean(total_expo)), "time_in_market": float(np.mean(total_expo > 0)),
+        "borrow_days_frac": float(np.mean(total_expo > 1.0 + BORROW_TOL)) if len(total_expo) else 0.0,
         "avg_exposure_by_asset": {k: float(np.nanmean(expo[k][start_idx:])) for k in keys},
         "dd_pauses": n_pause, "lag_triggers": len(lag_events), "lag_events": lag_events,
+        "liquidations": len(liq_events), "liq_events": liq_events,
+        "min_margin_level": float(min_margin_level) if min_margin_level != np.inf else None,
         "rel_dd_vs_hold": rel_dd, "rel_final_vs_hold": float(ratio_s[-1] - 1) if len(ratio_s) else 0.0,
         "bench_equity": bench[start_idx:],
         "exposure_key": hashlib.md5(np.round(total_expo, 4).tobytes()).hexdigest(),

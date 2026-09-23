@@ -22,6 +22,12 @@
     lag_window 0 = 自上次恢復（或起算）累計、>0 = 以 N 根前為基期的滾動相對表現；lag_action "hold" = 忽略趨勢判定改 100% 持有、"flat" = 空手；
     lag_resume "regime_reset"（趨勢重置）/ "bars"（隔 N 根）/ "ratio_high"（策略/持有比值創 N 根新高）；恢復時累計基期重設
 - funding_rate_8h：永續資金費率常數（每根日線扣 曝險 × 費率 × 3）；funding：逐日費率陣列（有值時覆蓋常數，負值為收入）
+- borrow_rate_annual：槓桿借款利息，每根對 max(0, 部位市值 − 權益) 計息
+- liq_level / liq_penalty：強平模擬 —— 借款 D = 部位市值 − 權益（與價格無關），保證金率 = 部位市值 / D；
+    當根最低價使保證金率 ≤ liq_level 就以 min(開盤, 強平價) × (1 − liq_penalty) 全部賣出，之後等趨勢重置才准重進；
+    liq_level = 0 只記錄 min_margin_level 不強平
+- dd_lever_full：回撤降槓桿 —— 目標槓桿上限 = 1 + (max_exposure − 1) × max(0, 1 − 回撤 / dd_lever_full)，
+    回撤高水位與 dd_pause 共用（趨勢重置時歸零）；波動目標與分級曝險在這個上限之下再乘
 - exec_delay_bars：收盤決策後延遲幾根才在開盤成交（0 = 下一根開盤）
 - rebalance_threshold：曝險差距超過此值才調倉
 
@@ -68,6 +74,10 @@ class RiskParams:
     funding_rate_8h: float = 0.0
     funding: np.ndarray | None = field(default=None, repr=False, compare=False)
     borrow_rate_annual: float = 0.0       # 槓桿借貸成本：每根對 max(0, 曝險 − 1) × 權益 計息（現貨保證金借 USDT 或永續資金費率之外的成本）
+    liq_level: float = 0.0                # 強平保證金率（部位市值 / 借款）；0 = 不模擬強平（仍記錄 min_margin_level）。Binance 現貨全倉 1.1；用當根最低價檢查
+    liq_penalty: float = 0.02             # 強平額外損失（清算費 + 衝擊），以強平價的比例計
+    redeploy_idle: bool = False           # 組合層：趨勢外標的的權重重新分給趨勢內標的（總曝險仍 ≤ max_exposure，不借錢）；單標的引擎不作用
+    dd_lever_full: float = 0.0            # 回撤降槓桿：權益回撤 0 → max_exposure、≥ 此值 → 1×，中間線性；0 = 關閉（只在 max_exposure > 1 有意義）
     exec_delay_bars: int = 0
     rebalance_threshold: float = 0.10
     initial_capital: float = 10_000.0
@@ -212,6 +222,9 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
     lag_min_margin = np.inf
     lag_events: list[dict] = []
     n_stop = n_pause = n_entries = n_exits = 0
+    n_liq = 0
+    liq_events: list[dict] = []
+    min_margin_level = np.inf
     funding_paid = 0.0
     borrow_paid = 0.0
     bh_qty = rp.initial_capital * (1 - rp.commission_pct) / c[start_idx]
@@ -284,6 +297,28 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                     scale_hi = 0.0
                     if reason == "ATR停損":
                         after_stop_fill(i, px, np.nan, i - 1 - rp.exec_delay_bars)
+        # 1b) 保證金率（最低價）與強平：借款 D = 部位市值 − 權益，與價格無關
+        pos = book.position()
+        if pos > 0:
+            debt = pos * o[i] - book.equity(o[i])
+            if debt > 1e-9:
+                ml = pos * l[i] / debt
+                min_margin_level = min(min_margin_level, ml)
+                if rp.liq_level > 0 and ml <= rp.liq_level:
+                    liq_px = min(o[i], rp.liq_level * debt / pos) * (1 - rp.liq_penalty)
+                    book.close_all(liq_px, i, t, "強平")
+                    record_fill(i, -1, "強平", pos, liq_px)
+                    n_liq += 1
+                    n_exits += 1
+                    liq_events.append({"bar": i, "time": str(t.date()), "margin_level": float(ml), "price": float(liq_px),
+                                       "equity_after": float(book.equity(c[i]))})
+                    stop = np.nan
+                    hi_close = np.nan
+                    scale_hi = 0.0
+                    pending = [p for p in pending if p[1] == 0.0]
+                    mode = "wait_reset"          # 強平後等趨勢重置才准重進
+                    stop_exit_px = np.nan
+                    regime_reset_since_stop = False
         # 2) 觸價型吊燈停損：前一根收盤算好的 stop，本根觸價成交
         if rp.atr_stop_mult > 0 and rp.stop_trigger == "low" and book.entries and not np.isnan(stop) and l[i] <= stop:
             px = min(o[i], stop) * (1 - rp.slippage_pct)
@@ -308,7 +343,7 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                 funding_paid += cost
                 eqv = book.equity(c[i])
             if rp.borrow_rate_annual > 0 and eqv > 0:
-                borrowed = max(0.0, pos * c[i] - eqv)
+                borrowed = max(0.0, pos * c[i] - eqv * 1.005)     # ≤ 0.5% 權益的手續費透支不算借款
                 if borrowed > 0:
                     cost = borrowed * rp.borrow_rate_annual / bars_per_year
                     book.realized -= cost
@@ -385,7 +420,10 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
         if not want:
             target = 0.0
         else:
-            target = rp.max_exposure
+            cap = rp.max_exposure
+            if rp.dd_lever_full > 0 and cap > 1.0:
+                cap = 1.0 + (cap - 1.0) * max(0.0, 1.0 - dd / rp.dd_lever_full)
+            target = cap
             if scale_arr is not None:
                 s = scale_arr[i] if scale_arr[i] == scale_arr[i] else 1.0
                 s = float(np.clip(s, 0.0, 1.0))
@@ -395,12 +433,14 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                 target *= max(s, rp.scale_floor)
             if rp.vol_target > 0 and not np.isnan(rvol[i]) and rvol[i] > 0:
                 if rp.vol_target_mode == "relative":
-                    factor = 1.0 if np.isnan(vol_ref[i]) else min(1.0, rp.vol_target * vol_ref[i] / rvol[i] / rp.max_exposure)
+                    factor = 1.0 if np.isnan(vol_ref[i]) else min(1.0, rp.vol_target * vol_ref[i] / rvol[i] / cap)
                 else:
-                    factor = min(1.0, rp.vol_target / rvol[i] / rp.max_exposure)
+                    factor = min(1.0, rp.vol_target / rvol[i] / cap)
                 target *= factor
         if lag_mode and not stop_hit_close and rp.lag_action != "record":
             target = rp.max_exposure if rp.lag_action == "hold" else 0.0
+        if eqv <= 0:
+            target = 0.0                     # 權益歸零（強平跳空）：不再交易
         current = pos * c[i] / eqv if eqv > 0 else 0.0
         # 已排隊但還沒成交的目標視為「即將達成」，避免延遲成交時重複排同一個目標
         ref = pending[-1][1] if pending else current
@@ -436,6 +476,8 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
     extra = {
         "stops": n_stop, "dd_pauses": n_pause, "regime_entries": n_entries, "regime_exits": n_exits,
         "n_fills": len(fills), "fills_by_reason": fills_by_reason, "funding_paid": funding_paid, "borrow_paid": borrow_paid,
+        "liquidations": n_liq, "liq_events": liq_events,
+        "min_margin_level": float(min_margin_level) if min_margin_level != np.inf else None,
         "max_exposure_seen": float(np.nanmax(ex)) if len(ex) else 0.0,
         "min_equity": float(np.nanmin(eq_s)) if len(eq_s) else 0.0,
         "notional_turnover": float(notional / np.nanmean(eq_s)) if np.nanmean(eq_s) > 0 else 0.0,

@@ -56,6 +56,31 @@ def test_lag_guard_portfolio():
     assert g.extra["rel_dd_vs_hold"] >= base.extra["rel_dd_vs_hold"] - 1e-9
 
 
+def test_portfolio_liquidation_and_vol_target():
+    import pandas as pd
+    n = 120
+    idx = pd.date_range("2022-01-01", periods=n, freq="1D", tz="UTC")
+    px = np.full(n, 100.0)
+    mk = lambda: pd.DataFrame({"open": px, "high": px * 1.01, "low": px * 0.99, "close": px, "volume": 1.0}, index=idx)
+    a, b = mk(), mk()
+    a.iloc[60, a.columns.get_loc("low")] = 60.0
+    b.iloc[60, b.columns.get_loc("low")] = 60.0
+    on = np.zeros(n, bool); on[10:110] = True
+    rp = RiskParams(max_exposure=3.0, commission_pct=0.0, slippage_pct=0.0, liq_level=1.1, liq_penalty=0.0)
+    r = simulate_portfolio({"A": a, "B": b}, {"A": on, "B": on}, rp, {"A": 0.5, "B": 0.5}, 5)
+    assert r.extra["liquidations"] == 1
+    assert abs(r.equity.iloc[-1] - 2000) < 1.0             # 與單標的 3× 案例同解
+    assert r.extra["n_fills"] == 4                           # 兩筆進場 + 兩筆強平，不重進
+    # 組合層與單標的一致（兩個相同標的）
+    s = simulate_regime(a, on, rp, 5)
+    assert abs(s.equity.iloc[-1] - r.equity.iloc[-1]) < 1.0
+    # 波動目標：壓低平均曝險
+    x, y, on_a, on_b = _two_assets()
+    base = simulate_portfolio({"A": x, "B": y}, {"A": on_a, "B": on_b}, RiskParams(max_exposure=1.5), {"A": 0.5, "B": 0.5}, 20)
+    vt = simulate_portfolio({"A": x, "B": y}, {"A": on_a, "B": on_b}, RiskParams(max_exposure=1.5, vol_target=0.05), {"A": 0.5, "B": 0.5}, 20)
+    assert vt.extra["avg_exposure"] < base.extra["avg_exposure"]
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

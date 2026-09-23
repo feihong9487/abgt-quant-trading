@@ -218,6 +218,50 @@ def test_lag_stop_hold_and_flat():
     assert abs(hold.extra["rel_log_vs_hold"].sum() - (np.log(hold.equity.iloc[-1] / hold.equity.iloc[0]) - np.log(df["close"].iloc[-1] / df["close"].iloc[10]))) < 1e-6
 
 
+def _crash_df():
+    """平盤 100 根後，第 60 根盤中最低價暴跌 40%、收盤回到原價。"""
+    n = 120
+    idx = pd.date_range("2022-01-01", periods=n, freq="1D", tz="UTC")
+    px = np.full(n, 100.0)
+    df = pd.DataFrame({"open": px, "high": px * 1.01, "low": px * 0.99, "close": px, "volume": 1.0}, index=idx)
+    df.iloc[60, df.columns.get_loc("low")] = 60.0
+    on = np.zeros(n, dtype=bool); on[10:110] = True
+    return df, on
+
+
+def test_liquidation_and_margin_level():
+    df, on = _crash_df()
+    rp = RiskParams(max_exposure=2.0, commission_pct=0.0, slippage_pct=0.0, liq_level=1.1, liq_penalty=0.0)
+    r = simulate_regime(df, on, rp, 5)
+    e = r.extra
+    # 2× → 借款 = 權益；保證金率 = 2·P/100；最低價 60 → 1.2 > 1.1，不強平
+    assert e["liquidations"] == 0 and abs(e["min_margin_level"] - 1.2) < 1e-6
+    rp3 = RiskParams(max_exposure=3.0, commission_pct=0.0, slippage_pct=0.0, liq_level=1.1, liq_penalty=0.0)
+    r3 = simulate_regime(df, on, rp3, 5)
+    e3 = r3.extra
+    # 3× → 部位 300、借款 200；強平價 = 1.1·200/3 = 73.33；權益剩 3·73.33 − 200 = 20
+    assert e3["liquidations"] == 1
+    assert abs(e3["liq_events"][0]["price"] - 1.1 * 200 / 3) < 1e-6
+    assert abs(r3.equity.iloc[-1] - (10000 * 0.2)) < 1.0
+    # 強平後同一段趨勢不得重進
+    assert e3["regime_entries"] == 1
+    # 不模擬強平時只記錄
+    r3n = simulate_regime(df, on, RiskParams(max_exposure=3.0, commission_pct=0.0, slippage_pct=0.0), 5)
+    assert r3n.extra["liquidations"] == 0 and r3n.extra["min_margin_level"] < 1.1
+
+
+def test_dd_lever_full_caps_leverage():
+    df = synthetic_ohlcv(600, "1D", seed=3, drift=0.0)
+    on = np.ones(600, dtype=bool)
+    a = simulate_regime(df, on, RiskParams(max_exposure=2.0), 30)
+    b = simulate_regime(df, on, RiskParams(max_exposure=2.0, dd_lever_full=0.2), 30)
+    assert b.extra["avg_exposure"] < a.extra["avg_exposure"]
+    assert b.extra["avg_exposure"] >= 0.99            # 最低降到 1×
+    c = simulate_regime(df, on, RiskParams(max_exposure=1.0, dd_lever_full=0.2), 30)
+    d = simulate_regime(df, on, RiskParams(max_exposure=1.0), 30)
+    assert c.extra["exposure_key"] == d.extra["exposure_key"]   # 1× 時不作用
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

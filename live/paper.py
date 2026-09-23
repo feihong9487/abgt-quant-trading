@@ -90,11 +90,16 @@ def step(st: dict, dfs: dict[str, pd.DataFrame], day: pd.Timestamp) -> dict:
     # 1) 開盤：成交昨天排的目標曝險
     fills_today = []
     if st["started"]:
-        nav_open = st["cash"] + sum(st["positions"][s] * rows[s]["open"] for s in symbols)
-        for s, target in list(st["pending"].items()):
+        # 先賣後買；買量以現金為上限（現貨不能透支）—— 與 simulate_portfolio 同規則
+        nav0 = st["cash"] + sum(st["positions"][s] * rows[s]["open"] for s in symbols)
+        todo = sorted(st["pending"].items(), key=lambda kv: kv[1] * nav0 / float(rows[kv[0]]["open"]) - st["positions"][kv[0]] > 0)
+        for s, target in todo:
             o = float(rows[s]["open"])
+            nav_open = st["cash"] + sum(st["positions"][x] * rows[x]["open"] for x in symbols)
             target_qty = target * nav_open / o
             diff = target_qty - st["positions"][s]
+            if diff > 0:
+                diff = min(diff, max(0.0, st["cash"]) / (o * (1 + slip) * (1 + fee)))
             if abs(diff) * o < 1e-6 * nav_open:
                 continue
             px = o * (1 + slip) if diff > 0 else o * (1 - slip)
