@@ -326,5 +326,51 @@
     "oos_min_delta": -0.05,
     "risk_path_dd_pp": 0.03,
     "holdout_avg_delta": 0.0
+  },
+  "portfolio_c_results": {
+    "ema50_plain_50_50": {
+      "sharpe": {
+        "IS": 1.24,
+        "OOS": 1.13,
+        "FULL": 1.17,
+        "IS2": 1.39,
+        "OOS2": 0.77
+      },
+      "single_avg": {
+        "IS": 1.14,
+        "OOS": 1.06,
+        "FULL": 1.08,
+        "IS2": 1.27,
+        "OOS2": 0.71
+      },
+      "bh_norebal": {
+        "IS": 1.04,
+        "OOS": 0.79,
+        "FULL": 0.9,
+        "IS2": 1.15,
+        "OOS2": 0.49
+      },
+      "max_dd": -0.588,
+      "bh_dd": -0.778,
+      "gates": "10/10 對兩種基準",
+      "turnover_per_year": 24.3,
+      "stress": "費/滑/常數資金費率/延遲 全過；歷史資金費率翻 IS、IS2"
+    },
+    "vol_atr_channel_50_50": {
+      "sharpe": {
+        "IS": 1.5,
+        "OOS": 1.1,
+        "FULL": 1.29,
+        "IS2": 1.55,
+        "OOS2": 0.8
+      },
+      "max_dd": -0.46,
+      "turnover_per_year": 9.9,
+      "gates": "10/10"
+    },
+    "portfolio_lag_guard_explore": {
+      "params": "lag_stop 0.2 累計 hold ratio_high 60",
+      "result": "反例：2021-05-05、2022-02-07 觸發轉持有抱住整段熊市，回撤 -80%、IS/FULL/IS2 掛；hold 動作在熊市 = 買在半山腰"
+    }
   }
 }
