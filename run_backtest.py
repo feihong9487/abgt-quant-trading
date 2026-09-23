@@ -20,11 +20,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from abgt import data as dt                      # noqa: E402
 from abgt.benchmark import buy_and_hold, gate, segment_table   # noqa: E402
 from abgt.metrics import num, pct, summarize     # noqa: E402
-from abgt.strategies import apex, bgt            # noqa: E402
+from abgt.strategies import apex, atr_channel, bgt   # noqa: E402
 
 STRATS = {
     "bgt": {"symbol": "ETH/USDT:USDT", "tf": "15m", "warmup_days": 30, "tick": 0.01},
     "apex": {"symbol": "BTC/USDT:USDT", "tf": "1d", "warmup_days": 420, "tick": 0.1},
+    "channel": {"symbol": "BTC/USDT:USDT", "tf": "1d", "warmup_days": 120, "tick": 0.1},
 }
 
 
@@ -95,6 +96,13 @@ def main() -> int:
         if args.require_kf_dir:
             label += "+45分方向閘"
             name += "_kfdir"
+    elif args.strategy == "channel":
+        built = atr_channel.build(df)
+        sig = df
+        fv = built["warmup"]
+        ep = built["risk"]
+        label = "ATR 通道遲滯（第 1 輪冠軍）"
+        name = "channel"
     else:
         p = apex.APEXParams()
         ep = apex.APEXEngineParams(tick_size=cfg["tick"])
@@ -117,6 +125,10 @@ def main() -> int:
             "百分比(多/空)": f"{int(w.prob_long.sum())}/{int(w.prob_short.sum())}",
             "45分翻轉次數": int(w.kf_flip.sum()),
         }
+    elif args.strategy == "channel":
+        res = atr_channel.run(df, start_idx)
+        extra = {"平均曝險": f"{res.extra['avg_exposure']:.2f}", "在場時間": f"{res.extra['time_in_market']:.0%}",
+                 "進/出": f"{res.extra['regime_entries']}/{res.extra['regime_exits']}"}
     else:
         res = apex.simulate(sig, ep, start_idx, p)
         kt = res.extra.get("kill_switch_time")

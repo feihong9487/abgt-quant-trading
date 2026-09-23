@@ -1,15 +1,17 @@
 {
   "purpose": "ABGT 持續優化迴圈的狀態檔。任何中斷（token 額度重置、工作階段重開）後，先讀這裡再繼續。",
-  "updated": "2026-09-23T17:25+08:00",
-  "round": 1,
-  "status": "round_1_workflow_running",
+  "updated": "2026-09-23T19:05+08:00",
+  "round": 2,
+  "status": "round_2_workflow_pending_launch",
   "workflow": {
-    "run_id": "wf_458942fb-fbc",
-    "script_path": "C:/Users/feihong/.claude/projects/C--Users-feihong/287fbefb-730e-4409-9cf4-4b83870f5428/workflows/scripts/abgt-optimize-round-wf_458942fb-fbc.js",
-    "resume_hint": "Workflow({scriptPath, resumeFromRunId: run_id}) 會沿用已完成代理的快取結果；先讀 transcript dir 的 journal.jsonl"
+    "script_path": "D:/feihong/tradingView/ABGT/experiments/workflows/optimize_round.js",
+    "run_id": null,
+    "previous_runs": [{"round": 1, "run_id": "wf_458942fb-fbc", "report": "experiments/rounds/round_1.md"}],
+    "resume_hint": "Workflow({scriptPath, resumeFromRunId: run_id, args}) 會沿用已完成代理的快取結果；先讀 transcript dir 的 journal.jsonl"
   },
   "baseline": {
     "id": "ema50_plain",
+    "note": "close > EMA50 滿倉否則空手；BTC/ETH 十格全過，holdout SOL 5/5、BNB 3/5",
     "meanSharpe": 1.09,
     "cells": {
       "BTC_IS": {"sharpe": 1.01, "max_dd": -0.564, "net_return": 2.11, "gate": true},
@@ -17,28 +19,49 @@
       "BTC_FULL": {"sharpe": 1.17, "max_dd": -0.564, "net_return": 14.14, "gate": true},
       "ETH_IS": {"sharpe": 1.26, "max_dd": -0.61, "net_return": 5.70, "gate": true},
       "ETH_OOS": {"sharpe": 0.71, "max_dd": -0.513, "net_return": 1.22, "gate": true},
-      "ETH_FULL": {"sharpe": 0.99, "max_dd": -0.612, "net_return": 13.87, "gate": true}
+      "ETH_FULL": {"sharpe": 0.99, "max_dd": -0.612, "net_return": 13.87, "gate": true},
+      "BTC_IS2": {"sharpe": 1.32, "gate": true}, "BTC_OOS2": {"sharpe": 0.97, "gate": true},
+      "ETH_IS2": {"sharpe": 1.22, "gate": true}, "ETH_OOS2": {"sharpe": 0.45, "gate": true}
     }
   },
   "ledger": [
-    {"id": "ema50_plain", "note": "close>EMA50 滿倉；6/6 過閘門；基準"},
-    {"id": "ema50_atr", "note": "EMA50 + 3xATR 吊燈停損 + 停損後等趨勢重置；BTC IS 崩到 +5%；2/6"},
+    {"id": "ema50_plain", "note": "close>EMA50 滿倉；十格全過；基準"},
+    {"id": "ema50_atr", "note": "EMA50 + 3xATR low 觸價吊燈停損 + 停損後等趨勢重置；BTC IS 崩到 +5%；2/6"},
     {"id": "turtle_55_20", "note": "Donchian 55/20 + 2xATR；回撤 -21% 但曝險 17%；4/6"},
-    {"id": "ema50_voltarget", "note": "EMA50 + 波動目標 60% + 停損 + 回撤暫停 25%；OOS 好 IS 差；1/6"}
+    {"id": "ema50_voltarget", "note": "EMA50 + 絕對波動目標 60% + 停損 + 回撤暫停 25%；1/6"},
+    {"id": "vol_atr_channel", "note": "EMA50 +1.0 ATR 進 / -0.25 ATR 出；BTC/ETH 十格全過、回撤六格全淺、換手 1/2.5，但 holdout SOL 3/5、BNB 0/5（對基準 Δ 負），資金費率/延遲情境 BTC OOS 掉閘門；已正式化為 atr_channel.py，不取代基準"},
+    {"id": "vol_downside_gate", "note": "EMA50 + 20 日下行/上行半變異比值崩盤閘（1.5 觸發 / 1.0 解除）；6/6 但 BTC 三區間全劣於基準、ETH 優勢集中在前 10 個單日且延遲一根即消失"},
+    {"id": "vol_shock_budget", "note": "EMA50 + 絕對波動預算 0.70（rvol10）；6/6 但 0.70 是 IS 校準、BTC 2025 後死碼、替換切分 ETH OOS 失敗"},
+    {"id": "ensemble_ema_ladder_vote", "note": "巢狀 EMA K-of-N 投票；等價於 close > 第 K 低 EMA；回撤更深、對基準 t<0.5"},
+    {"id": "exit_ema50_stall", "note": "EMA50 + 時間停滯出場；停滯標記的是盤整低點不是頂部，5/8 鞭打"},
+    {"id": "exit_ema50_band", "note": "EMA50 ± 0.5 ATR 對稱 Schmitt 帶；5/6，BTC OOS 差 0.03；對稱帶在單邊行情每邊付 1–1.5% 延遲"},
+    {"id": "ensemble_donchian_ladder", "note": "Donchian 20/55/100 多數決；4/6，100 日機關閉時退化成買高被掃"},
+    {"id": "classic_tsmom_1_3_12", "note": "月末 TSMOM 1/3/12；4/6，ETH 單月急跌擊穿 Calmar；月度粒度視為已探完"},
+    {"id": "ensemble_family_vote", "note": "五家族多數決 k=3；3/6，沒有一個 k 同時在牛熊橫盤都穩"},
+    {"id": "classic_faber_10m_sma", "note": "Faber 10 月 SMA；3/6，ETH 2023 後 V 型震盪比月頻快"},
+    {"id": "classic_golden_cross_50_200", "note": "EMA50/200 黃金交叉；3/6，均線對均線滯後系統性底部出頂部進"},
+    {"id": "exit_ema50_chandelier_immediate", "note": "EMA50 + 3xATR low 觸價停損 + 立即重進；2/6，78% 重進價高於停損價"}
   ],
-  "rounds_without_champion": 0,
+  "rounds_without_champion": 1,
   "stop_rule": "連續 3 輪沒有新 champion 就停止並推播回報",
+  "directions_round_2": [
+    {"key": "crashgate", "n": 2, "prompt": "在基準 ema50_plain 上疊加崩盤閘：in_regime = (close > EMA50) & ~crash。crash 沿用 vol_downside_gate 的 20 日下行/上行半變異比值（觸發 1.5 / 解除 1.0），但必須加尺度無關的絕對門檻，例如年化下行波動 > 自身 250 日中位數 × 1.25（嚴格只用 ≤ i 根），避免平靜市場的邊緣觸發（BTC 2021-01、2023-09 那種）。假設：ETH 的 IS 1.26→1.5+、BTC 不劣化超過 0.05。第二個變體可改用其他崩盤定義（例如 5 日報酬 < −2×20 日 ATR%），同樣要有絕對門檻。"},
+    {"key": "closestop", "n": 2, "prompt": "基準或通道 + 收盤確認吊燈停損（引擎已支援：atr_stop_mult、stop_trigger=\"close\"、reentry=\"close_above_stop\" 或 \"immediate\"、reentry_min_bars）。上一輪證明 low 觸價 + 立即重進是付費買下影線保險，這輪要驗證「停損只截斷真正崩盤（2021-05、2022-05 類）」是否成立。停損倍數用 3–4 ATR，重進要有價格門檻。判準：BTC/ETH OOS 對基準 Δ ≥ −0.05 且回撤縮小 ≥ 5 pp。"},
+    {"key": "fastreentry", "n": 2, "prompt": "處理 V 型反轉的進場延遲：進場條件 = close > EMA50 + 1.0 ATR **或**（close > EMA50 且 close 創 20 日新高）；出場 = close < EMA50 − 0.25 ATR（或純 EMA50）。用引擎的 {enter, exit} 狀態機。假設：2023-01 BTC、2024-11 這類穿越後不回頭的行情少付 1 ATR 延遲，OOS 淨報酬追回持有一部分；風險是熊市反彈裡 20 日新高更常出現。第二個變體可用「連續 N 日收在 EMA50 上」當快速確認。"},
+    {"key": "relvol", "n": 2, "prompt": "尺度無關的波動預算（引擎已支援）：EMA50 + RiskParams(vol_target_mode=\"relative\", vol_side=\"downside\", vol_target=1.3~1.5, vol_ref_lookback=365, vol_lookback=20, rebalance_threshold=0.15)。假設：vol_shock_budget 在 IS 的正貢獻（躲 2020-03、2021-05）保留，OOS 砍到牛市噴出段的負貢獻消失，BTC 2025 後不再是死碼。第二個變體改 vol_side=\"total\" 或 vol_lookback=10 對照。注意換手：調倉門檻要壓住手續費。"},
+    {"key": "crossasset", "n": 2, "prompt": "跨標的穩健性：上一輪冠軍候選在 SOL/BNB holdout 輸給純 EMA50，說明「在 BTC/ETH 上調出來的規則」泛化不了。設計參數尺度無關、規則極簡的變體：例如 EMA 長度由該標的自身的波動決定（高波動用較短 EMA）、或以「收盤在 EMA50 上方的比例（過去 5 日 ≥ 3 日）」取代單日判定、或 EMA50 + 極小對稱帶（±0.1 ATR）只濾單日鋸齒。判準：BTC/ETH/SOL/BNB 四標的的 OOS 對基準 Δ 都 ≥ −0.03（holdout 驗證者會跑 SOL/BNB）。"}
+  ],
   "per_round_procedure": [
-    "1. 讀 experiments/rounds/round_N.md 與工作流回傳的 synthesis",
-    "2. champion != baseline → 複製變體到 abgt/strategies/ 正式化、更新 CLAUDE.md 第 5 節與本檔 baseline",
-    "3. 實作 synthesis.engine_proposals 裡合理的引擎改進（abgt/strategies/regime.py），保持向後相容",
-    "4. .venv/Scripts/python.exe tests/test_smoke.py 必須 7/7",
+    "1. 讀 experiments/rounds/round_N.md 與工作流回傳的 synthesis（champion、champion_cells、engine_proposals、next_round_ideas）",
+    "2. champion != baseline 且 holdout 驗證 pass → 正式化到 abgt/strategies/、更新 CLAUDE.md 第 5 節與本檔 baseline；否則 rounds_without_champion += 1",
+    "3. 實作 synthesis.engine_proposals 裡合理的引擎改進（abgt/strategies/regime.py），保持預設行為不變，跑回歸（冠軍與基準數字須逐位相同）",
+    "4. .venv/Scripts/python.exe tests/test_smoke.py 與 tests/test_regime.py 必須全過",
     "5. git add -A && git commit（附 Co-Authored-By 行）",
-    "6. 把新變體加進 ledger、round+1、更新本檔，再用新 baseline/ledger 啟動下一輪 abgt-optimize-round 工作流（腳本同 script_path，args 換掉）"
+    "6. 把新變體加進 ledger、round+1、directions 換成 next_round_ideas、更新本檔，再用 Workflow({scriptPath, args:{round, baseline, ledger, directions}}) 啟動下一輪；把 run_id 寫回本檔並 commit"
   ],
   "resume_after_interruption": [
     "若 status 是 *_workflow_running：先用 resumeFromRunId 續跑工作流，不要重開新的",
-    "若 status 是 integrating：檢查 git status，把未完成的第 2–6 步做完",
-    "若 status 是 idle_between_rounds：直接做第 6 步"
+    "若 status 是 *_pending_launch：直接做第 6 步啟動",
+    "若 status 是 integrating：檢查 git status，把未完成的第 2–6 步做完"
   ]
 }
