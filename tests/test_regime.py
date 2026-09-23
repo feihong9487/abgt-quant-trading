@@ -131,6 +131,61 @@ def test_dd_pause_resume_bars():
     assert df.index.get_loc(re_bars.iloc[0]["entry_time"]) - df.index.get_loc(pause_exit) >= 10
 
 
+def test_close_stop_with_delay_no_reentry_bypass():
+    """P1：收盤觸發停損 × 延遲成交時，出場排隊中不得再排進場；重進規則從成交根起算。"""
+    df, on = _flag_df()
+    df = df.copy()
+    c = df["close"].to_numpy().copy()
+    c[100:120] = c[99] * np.linspace(0.97, 0.6, 20)
+    df["close"] = c
+    df["open"] = np.concatenate([[c[0]], c[:-1]])
+    df["high"] = np.maximum(df["open"], df["close"]) * 1.002
+    df["low"] = np.minimum(df["open"], df["close"]) * 0.998
+    for reentry in ("reset", "close_above_stop", "immediate"):
+        rp = RiskParams(atr_stop_mult=2.0, stop_trigger="close", reentry=reentry, exec_delay_bars=1, reentry_min_bars=5)
+        r = simulate_regime(df, on, rp, 10)
+        stops = r.trades[r.trades.reason == "ATR停損"]
+        assert len(stops) >= 1, reentry
+        st = stops.iloc[0]
+        i_fill = df.index.get_loc(st["exit_time"])
+        # 停損成交根之前（決策根到成交根之間）不得有任何進場
+        between = r.trades[(r.trades.entry_time > df.index[i_fill - 2]) & (r.trades.entry_time <= st["exit_time"])]
+        assert len(between) == 0, (reentry, between)
+        later = r.trades[(r.trades.entry_time > st["exit_time"]) & (r.trades.entry_time < df.index[150])]
+        if reentry == "reset":
+            assert len(later) == 0
+        else:
+            for _, t in later.iterrows():
+                assert df.index.get_loc(t["entry_time"]) - i_fill >= 5 + 1   # reentry_min_bars 從成交根起算，再加下一根成交
+        ev = r.extra["stop_events"]
+        assert ev and ev[0]["fill_bar"] == i_fill and ev[0]["decision_bar"] == i_fill - 2
+
+
+def test_scale_graded_exposure():
+    """P2：scale 陣列分級曝險，經 rebalance_threshold 才調倉。"""
+    df, on = _flag_df()
+    scale = np.where(on, 0.5, np.nan)
+    scale[80:150] = 1.0
+    r = simulate_regime(df, {"in_regime": on, "scale": scale}, RiskParams(rebalance_threshold=0.1), 10)
+    ex = r.extra
+    assert ex["partial_days"] > 20 and 0.4 < ex["avg_exposure_in_regime"] < 1.0
+    adj = r.trades[r.trades.reason == "調整曝險"]
+    assert len(adj) == 0   # 只有加碼（0.5→1.0）沒有減碼，所以沒有「調整曝險」的出場紀錄
+    assert ex["n_fills"] >= 4 and ex["regime_entries"] == 2 and ex["regime_exits"] == 2
+    r0 = simulate_regime(df, on, RiskParams(), 10)
+    assert r0.extra["exposure_key"] != ex["exposure_key"]
+
+
+def test_funding_array_income_and_cost():
+    df, on = _flag_df()
+    r0 = simulate_regime(df, on, RiskParams(), 10)
+    neg = np.full(len(df), -0.0003)
+    r_income = simulate_regime(df, on, RiskParams(funding=neg), 10)
+    r_cost = simulate_regime(df, on, RiskParams(funding=-neg), 10)
+    assert r_income.equity.iloc[-1] > r0.equity.iloc[-1] > r_cost.equity.iloc[-1]
+    assert r_income.extra["funding_paid"] < 0 < r_cost.extra["funding_paid"]
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

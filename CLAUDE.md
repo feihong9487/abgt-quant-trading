@@ -145,6 +145,24 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 
 第 1 輪促成的引擎升級（`regime.py` v2，回歸測試與第 1 輪數字逐位一致）：enter/exit 狀態機由引擎維護；停損可收盤確認（`stop_trigger="close"`）；重進規則加 `close_above_stop` 與 `reentry_min_bars`；波動目標加尺度無關的 `relative` 模式與只算下行的 `downside`；回撤暫停加 `new_high` / `bars` 恢復；資金費率與執行延遲可模擬。評估器加替換切分、`--sens-factors`、對基準逐格 Δ 與配對 t、四組壓力情境、敏感度去重（映射到相同 in_regime 的擾動不計）。
 
+### 優化迴圈 第 2 輪（2026-09-23，`experiments/rounds/round_2.md`）
+
+24 個代理：5 方向 × 2 變體 → 10 個全部評估（十格 + 敏感度 + 壓力 + 對基準 Δ）→ 前 2 名四道驗證 → 綜合。**無新冠軍（連續 2 輪）**。
+
+| 變體 | 十格 | 六格平均 Sharpe | 對基準 OOS 最低 Δ | 一句話 |
+|------|------|----------------|------------------|--------|
+| fastreentry_channel_or_20d_high | 10/10 | 1.155 | −0.098 | 快速腿（close > EMA50 且 20 日新高）是「突破次日押續漲」的對稱賭注：提早進場段由構造必勝、通道不會進的多餘回合 BTC 0/12 勝；overfit / executable 判 fail |
+| fastreentry_channel_or_3bar_confirm | 10/10 | 1.134 | −0.093 | 同上，連續 3 日確認版 |
+| relvol_ema50_downside / _total | 10/10 | 1.089 / 1.086 | −0.013 / +0.008 | 尺度無關波動預算「單獨不傷」但也沒加分，downside 版 BTC t ≈ −2.25（本輪唯一顯著、方向為負） |
+| closestop_ema50_c3atr_hold7 | 9/10 | 1.094 | −0.157 | 收盤確認停損 + 重進門檻：停損截到的是回檔不是崩盤，仍是低賣高買 |
+| crashgate_ret5_atr_abs / _dvol_ratio_abs | 9/10 | 1.02 | −0.09 / −0.03 | 加了絕對門檻的崩盤閘在 BTC 是死碼、在 ETH 回檔低賣 |
+| crossasset_ema50_majority_vote / _run_hysteresis | 8/10 | 1.12 / 1.07 | −0.14 / −0.18 | 時間域濾波（5 日多數決、連續根遲滯）在出場側吃掉整根崩盤日 |
+| closestop_channel_c3atr_hold7 | 7/10 | 1.137 | −0.271 | 通道 + 停損：回撤優勢被還回去 |
+
+結論：第 1 輪路線圖的四個方向全部否定，共同原因是日線 EMA50 本身已是約一週尺度的崩盤偵測器 — 疊加保護型規則是死碼或回檔低賣高買，放鬆型規則還回通道的回撤與換手優勢，時間域濾波在出場側付整根崩盤日。壓力測試用歷史資金費率重跑基準：BTC IS 掉閘門、ETH 五格全掛 → 永續執行不可行，只能現貨。
+
+第 2 輪促成的引擎 v3：修正「收盤觸發停損 × 延遲成交」時出場排隊中會再排進場的 bug（重進規則改從成交根起算、`stop_events` 逐次紀錄）；`in_regime` dict 可帶 `scale` 陣列做分級曝險；`extra` 加 `exposure_key` / `fill_key` / `n_fills`，敏感度去重改看「regime 與曝險都相同」；`RiskParams.funding` 可放逐日歷史費率陣列，`data.fetch_funding()` 抓 Binance 費率歷史，壓力測試多一組「歷史資金費率」。
+
 取代冠軍的門檻（第 2 輪起）：十格 ≥ 9 且四個 OOS 格全過、六格平均 Sharpe 高於冠軍、四個 OOS 格對冠軍 ΔSharpe ≥ −0.05、OOS 敏感度通過率 ≥ 0.67、前視 / 過擬合（超額 Sharpe 口徑）/ holdout（SOL+BNB 十格 ≥ 5 過且平均 Δ ≥ −0.05）三道驗證全過。
 
 ### 結論（2026-09-23）
@@ -163,9 +181,10 @@ APEX：`abgt/strategies/apex.py` `APEXParams`，與 `../APEX/CLAUDE.md` §1.4 �
 - [x] 閘門改風險調整（使用者決定，2026-09-23）
 - [x] 曝險型引擎 + 變體評估器 + 四個基準變體
 - [x] 多代理設計 / 對抗驗證迴圈 第 1 輪（`experiments/workflows/optimize_round.js`，狀態在 `experiments/rounds/loop_state.json`）
-- [ ] 第 2 輪起：崩盤閘（含絕對波動下限）、收盤確認停損 + 重進門檻、快速重進、相對下行波動預算、跨標的穩健規則；連續 3 輪無新冠軍即停
+- [x] 第 2 輪：崩盤閘、收盤確認停損、快速重進、相對下行波動預算、跨標的時間濾波 — 全部否定
+- [ ] 第 3 輪（最後一輪機會，連續 3 輪無新冠軍即停）：情境自適應進場門檻、BTC 領先閘（跨標的資訊）、慢波動尺度帶寬、量能確認進場、分級曝險（scale）
 - [x] 通道版正式化 `abgt/strategies/atr_channel.py`；冠軍（目前仍是 ema50_plain）的 Pine 版待做
-- [ ] 資金費率歷史資料接進 data.py（永續執行的真實成本）
+- [x] 資金費率歷史資料接進 data.py；結論：永續執行成本讓基準 ETH 全掛、BTC IS 掉閘門，上線走現貨
 - [ ] 運行閘門 + Binance 測試網下單（`live/`）
 
 ## 7. 與 Claude 協作

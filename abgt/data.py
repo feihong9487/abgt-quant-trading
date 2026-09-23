@@ -66,6 +66,63 @@ def fetch_ohlcv(symbol: str, timeframe: str, since: str, cache_dir: str = "data"
     return _to_frame(df)
 
 
+def funding_path(cache_dir: str, symbol: str) -> str:
+    return os.path.join(cache_dir, f"{symbol.replace('/', '').replace(':', '_')}_funding.csv")
+
+
+def fetch_funding(symbol: str, since: str, cache_dir: str = "data", exchange_id: str = "binanceusdm",
+                  limit: int = 1000, verbose: bool = True) -> pd.Series:
+    """永續資金費率歷史（每 8 小時一筆），回傳「每個 UTC 日的費率合計」Series（index = 日期 00:00 UTC）。"""
+    os.makedirs(cache_dir, exist_ok=True)
+    path = funding_path(cache_dir, symbol)
+    ex = getattr(ccxt, exchange_id)({"enableRateLimit": True})
+    since_ms = ex.parse8601(f"{since}T00:00:00Z")
+    now_ms = ex.milliseconds()
+    cached = None
+    cursor = since_ms
+    if os.path.exists(path):
+        cached = pd.read_csv(path)
+        if len(cached) and int(cached["timestamp"].iloc[0]) <= since_ms + 86_400_000:
+            cursor = int(cached["timestamp"].iloc[-1]) + 1
+        else:
+            cached = None
+    rows = []
+    while cursor < now_ms:
+        batch = ex.fetch_funding_rate_history(symbol, since=cursor, limit=limit)
+        if not batch:
+            break
+        rows.extend({"timestamp": b["timestamp"], "rate": float(b["fundingRate"])} for b in batch)
+        nxt = batch[-1]["timestamp"] + 1
+        if nxt <= cursor:
+            break
+        cursor = nxt
+        if len(batch) < limit:
+            break
+    new = pd.DataFrame(rows, columns=["timestamp", "rate"])
+    df = pd.concat([cached, new]) if cached is not None else new
+    df = df.drop_duplicates("timestamp").sort_values("timestamp")
+    df = df[df["timestamp"] >= since_ms]
+    df.to_csv(path, index=False)
+    if verbose:
+        print(f"  {symbol} funding: {len(df)} 筆（新抓 {len(new)}）")
+    return _funding_daily(df)
+
+
+def load_funding_cached(cache_dir: str, symbol: str) -> pd.Series | None:
+    path = funding_path(cache_dir, symbol)
+    if not os.path.exists(path):
+        return None
+    return _funding_daily(pd.read_csv(path))
+
+
+def _funding_daily(df: pd.DataFrame) -> pd.Series:
+    t = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+    s = pd.Series(df["rate"].to_numpy(dtype="float64"), index=t)
+    daily = s.resample("1D").sum()
+    daily.name = "funding"
+    return daily
+
+
 def _to_frame(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out.index = pd.to_datetime(out.pop("timestamp"), unit="ms", utc=True)

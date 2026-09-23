@@ -74,7 +74,10 @@ def run_once(df: pd.DataFrame, mod, params: dict, windows, risk_override: dict |
     if risk_override:
         rp = dataclasses.replace(rp, **risk_override)
     res = simulate_regime(df, in_regime, rp, warmup)
-    out = {"windows": {}, "extra": res.extra, "regime_key": regime_key(in_regime), "warmup": warmup, "equity": res.equity}
+    extra = {k: v for k, v in res.extra.items() if k != "stop_events"}
+    extra["n_stop_events"] = len(res.extra.get("stop_events", []))
+    out = {"windows": {}, "extra": extra, "regime_key": regime_key(in_regime), "exposure_key": res.extra["exposure_key"],
+           "warmup": warmup, "equity": res.equity}
     for wname, wstart, wend in windows:
         s0 = max(warmup, int(df.index.searchsorted(pd.Timestamp(wstart, tz="UTC"))))
         s1 = int(df.index.searchsorted(pd.Timestamp(wend, tz="UTC"), side="right")) if wend else len(df)
@@ -107,7 +110,8 @@ def compare_to_baseline(df: pd.DataFrame, r: dict, rb: dict, windows) -> dict:
     return out
 
 
-def sensitivity(df: pd.DataFrame, mod, params: dict, windows, factors: list[float], base_key: str) -> dict:
+def sensitivity(df: pd.DataFrame, mod, params: dict, windows, factors: list[float], base_key: tuple) -> dict:
+    """base_key = (regime_key, exposure_key)：兩者都相同的擾動才視為「沒有改變任何東西」而去重。"""
     rows = []
     seen = {base_key}
     for k, v in params.items():
@@ -123,8 +127,9 @@ def sensitivity(df: pd.DataFrame, mod, params: dict, windows, factors: list[floa
             except Exception as ex:  # noqa: BLE001
                 rows.append({"param": k, "factor": f, "value": p2[k], "error": str(ex)})
                 continue
-            row = {"param": k, "factor": f, "value": p2[k], "same_regime": r["regime_key"] in seen}
-            seen.add(r["regime_key"])
+            key = (r["regime_key"], r["exposure_key"])
+            row = {"param": k, "factor": f, "value": p2[k], "same_regime": key in seen}
+            seen.add(key)
             for wname, w in r["windows"].items():
                 row[f"{wname}_sharpe"] = w["strategy"]["sharpe"]
                 row[f"{wname}_pass"] = w["gate"]["passed"]
@@ -143,11 +148,20 @@ def sensitivity(df: pd.DataFrame, mod, params: dict, windows, factors: list[floa
     return {"summary": summary, "rows": rows}
 
 
-def stress(df: pd.DataFrame, mod, params: dict, windows) -> dict:
+def stress(df: pd.DataFrame, mod, params: dict, windows, funding: pd.Series | None = None) -> dict:
     out = {}
-    for name, ov in STRESS.items():
+    configs = dict(STRESS)
+    if funding is not None:
+        arr = funding.reindex(df.index).fillna(0.0).to_numpy(dtype="float64")
+        configs["歷史資金費率"] = {"funding": arr}
+    for name, ov in configs.items():
         r = run_once(df, mod, params, windows, risk_override=ov)
         out[name] = {w: {"sharpe": x["strategy"]["sharpe"], "max_dd": x["strategy"]["max_dd"], "pass": x["gate"]["passed"]} for w, x in r["windows"].items()}
+        if name == "歷史資金費率":
+            years = (df.index[-1] - df.index[max(r["warmup"], 0)]).days / 365.25
+            avg_equity = float(r["equity"].mean())
+            out[name]["_funding_paid"] = r["extra"]["funding_paid"]
+            out[name]["_funding_cost_pct_per_year"] = r["extra"]["funding_paid"] / avg_equity / years if years > 0 and avg_equity > 0 else None
     return out
 
 
@@ -163,7 +177,7 @@ def fmt_windows(sym: str, r: dict, cmp_: dict | None) -> str:
         lines.append(f"{wname:6}{'策略':6}{pct(s['net_return']):>9}{pct(s['max_dd']):>8}{pct(s['cagr']):>8}{num(s['sharpe']):>8}{num(s['calmar']):>8}{s.get('round_trips', 0):>5}{'✓' if g['passed'] else '✗':>5}{extra}")
         lines.append(f"{'':6}{'持有':6}{pct(b['net_return']):>9}{pct(b['max_dd']):>8}{pct(b['cagr']):>8}{num(b['sharpe']):>8}{num(b['calmar']):>8}")
     e = r["extra"]
-    lines.append(f"平均曝險 {e['avg_exposure']:.2f} | 在場 {e['time_in_market']:.0%} | 進/出 {e.get('regime_entries', 0)}/{e.get('regime_exits', 0)} | ATR 停損 {e['stops']} | 回撤暫停 {e['dd_pauses']}" + (f" | 資金費率 {e['funding_paid']:.0f}" if e.get("funding_paid") else ""))
+    lines.append(f"平均曝險 {e['avg_exposure']:.2f}（趨勢內 {e.get('avg_exposure_in_regime', 0):.2f}，部分曝險 {e.get('partial_days', 0)} 天）| 在場 {e['time_in_market']:.0%} | 進/出 {e.get('regime_entries', 0)}/{e.get('regime_exits', 0)} | 成交 {e.get('n_fills', 0)} | ATR 停損 {e['stops']} | 回撤暫停 {e['dd_pauses']}" + (f" | 資金費率 {e['funding_paid']:.0f}" if e.get("funding_paid") else ""))
     return "\n".join(lines)
 
 
@@ -202,9 +216,9 @@ def main() -> int:
             cmp_ = compare_to_baseline(df, r, rb, windows)
             r["vs_baseline"] = cmp_
         if args.sensitivity:
-            r["sensitivity"] = sensitivity(df, mod, params, windows, factors, r["regime_key"])
+            r["sensitivity"] = sensitivity(df, mod, params, windows, factors, (r["regime_key"], r["exposure_key"]))
         if args.stress:
-            r["stress"] = stress(df, mod, params, windows)
+            r["stress"] = stress(df, mod, params, windows, dt.load_funding_cached("data", sym))
         r.pop("equity", None)
         report["symbols"][sym] = r
         text.append(fmt_windows(sym, r, cmp_))
@@ -215,7 +229,9 @@ def main() -> int:
             text.append(f"敏感度（{ss['n']} 組擾動，{ss['n_effective']} 組真的改變 in_regime；倍數 {args.sens_factors}）" + (" | " + " | ".join(parts) if parts else ""))
         if args.stress:
             for name, per_w in r["stress"].items():
-                text.append(f"壓力 {name:14} " + "  ".join(f"{w}:{num(x['sharpe'])}{'✓' if x['pass'] else '✗'}" for w, x in per_w.items()))
+                cells = "  ".join(f"{w}:{num(x['sharpe'])}{'✓' if x['pass'] else '✗'}" for w, x in per_w.items() if not w.startswith("_"))
+                tail = f"  （資金費率成本 ≈ 平均權益的 {per_w['_funding_cost_pct_per_year'] * 100:.1f}%/年）" if per_w.get("_funding_cost_pct_per_year") else ""
+                text.append(f"壓力 {name:14} {cells}{tail}")
     out_text = "\n".join(text)
     print(out_text)
     os.makedirs(args.out, exist_ok=True)

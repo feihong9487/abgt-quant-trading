@@ -1,8 +1,9 @@
 """曝險型趨勢跟隨引擎：趨勢內持倉、趨勢外空手，風控模型可組合。
 
-策略提供趨勢判定（每根收盤判定，不可用未來資料），兩種形式：
+策略提供趨勢判定（每根收盤判定，不可用未來資料），三種形式：
 - np.ndarray[bool] in_regime：直接給狀態
 - dict(enter=np.ndarray[bool], exit=np.ndarray[bool])：引擎維護狀態機 —— 趨勢外且 enter → 進、趨勢內且 exit → 出、其餘維持
+- dict 另可加 scale=np.ndarray[float]（每根 0–1 的目標曝險倍數，NaN 視為 1）：分級曝險，經 rebalance_threshold 才調倉
 
 風控由 RiskParams 決定：
 - max_exposure：趨勢內的目標曝險（1.0 = 100% 權益）
@@ -11,11 +12,12 @@
     relative：曝險 = min(max_exposure, vol_target × ref / rvol)，ref = rvol 過去 vol_ref_lookback 根的中位數（尺度無關）
     vol_side total = 全部報酬的標準差；downside = 只算負報酬的半變異
 - atr_stop_mult / stop_trigger：吊燈式追蹤停損（進場後最高收盤 − mult × ATR）
-    stop_trigger "low" = K 線內觸價成交；"close" = 收盤跌破才觸發，下一根開盤成交
-- reentry：停損後何時准重進 —— "reset" 等趨勢先轉空再轉多；"immediate" 立刻；"close_above_stop" 收盤高於停損出場價才准
-- reentry_min_bars：停損後至少隔 N 根才准重進
+    stop_trigger "low" = K 線內觸價成交；"close" = 收盤跌破才觸發，下一根（+ 延遲）開盤成交
+- reentry：停損後何時准重進 —— "reset" 等趨勢先轉空再轉多；"immediate" 立刻；"close_above_stop" 收盤高於停損成交價才准
+- reentry_min_bars：停損成交後至少隔 N 根才准重進
+- 出場單（停損或趨勢結束）排隊中一律不得排新進場
 - dd_pause / dd_pause_resume：權益從高水位回撤 ≥ X 時空手；恢復規則 "regime_reset"（趨勢重置）/ "new_high"（收盤創 N 日新高）/ "bars"（隔 N 根）
-- funding_rate_8h：永續資金費率（每根日線扣 曝險 × 費率 × 3）
+- funding_rate_8h：永續資金費率常數（每根日線扣 曝險 × 費率 × 3）；funding：逐日費率陣列（有值時覆蓋常數，負值為收入）
 - exec_delay_bars：收盤決策後延遲幾根才在開盤成交（0 = 下一根開盤）
 - rebalance_threshold：曝險差距超過此值才調倉
 
@@ -23,7 +25,8 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -50,6 +53,7 @@ class RiskParams:
     dd_resume_high_n: int = 20
     dd_resume_bars: int = 20
     funding_rate_8h: float = 0.0
+    funding: np.ndarray | None = field(default=None, repr=False, compare=False)
     exec_delay_bars: int = 0
     rebalance_threshold: float = 0.10
     initial_capital: float = 10_000.0
@@ -84,7 +88,7 @@ def regime_donchian(df: pd.DataFrame, entry_len: int, exit_len: int) -> np.ndarr
 
 
 def regime_atr_channel(df: pd.DataFrame, ema_len: int = 50, atr_len: int = 14, k_in: float = 1.0, k_out: float = 0.25):
-    """第 1 輪冠軍：EMA ± ATR 不對稱通道遲滯。回傳 (enter, exit, warmup)。"""
+    """第 1 輪最佳變體：EMA ± ATR 不對稱通道遲滯。回傳 (enter, exit, warmup)。"""
     c, h, l = (df[k].to_numpy(dtype="float64") for k in ("close", "high", "low"))
     ema = ta.ema(c, ema_len)
     atr = ta.atr(h, l, c, atr_len)
@@ -115,6 +119,20 @@ def state_machine(enter: np.ndarray, exit_: np.ndarray) -> np.ndarray:
     return out
 
 
+def regime_flags(in_regime) -> tuple[np.ndarray, np.ndarray | None]:
+    """把三種輸入形式統一成 (on 布林陣列, scale 陣列或 None)。"""
+    if isinstance(in_regime, dict):
+        if "enter" in in_regime:
+            exit_ = in_regime.get("exit")
+            enter = np.asarray(in_regime["enter"], dtype=bool)
+            on = state_machine(enter, exit_ if exit_ is not None else ~enter)
+        else:
+            on = np.asarray(in_regime["in_regime"], dtype=bool)
+        scale = in_regime.get("scale")
+        return on, (np.asarray(scale, dtype="float64") if scale is not None else None)
+    return np.asarray(in_regime, dtype=bool), None
+
+
 def _realized_vol(c: np.ndarray, rp: RiskParams, bars_per_year: float) -> tuple[np.ndarray, np.ndarray]:
     """回傳 (rvol, ref)。ref 只在 relative 模式有值。"""
     r = np.log(c / ta.shift(c, 1))
@@ -130,39 +148,61 @@ def _realized_vol(c: np.ndarray, rp: RiskParams, bars_per_year: float) -> tuple[
     return rvol, ref
 
 
+_MODE_AFTER_STOP = {"reset": "wait_reset", "immediate": "armed", "close_above_stop": "wait_price"}
+
+
 # ---------- 引擎 ----------
 
 def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int) -> BacktestResult:
     idx = df.index
     o, h, l, c = (df[k].to_numpy(dtype="float64") for k in ("open", "high", "low", "close"))
     n = len(c)
-    if isinstance(in_regime, dict):
-        on_arr = state_machine(in_regime["enter"], in_regime["exit"] if in_regime.get("exit") is not None else ~np.asarray(in_regime["enter"], dtype=bool))
-    else:
-        on_arr = np.asarray(in_regime, dtype=bool)
+    on_arr, scale_arr = regime_flags(in_regime)
     atr = ta.atr(h, l, c, rp.atr_len)
     bars_per_year = 365.0 * 86400.0 / pd.Series(idx).diff().dropna().median().total_seconds()
     rvol, vol_ref = _realized_vol(c, rp, bars_per_year)
     hi_n = ta.highest(c, rp.dd_resume_high_n)
+    funding_arr = None
+    if rp.funding is not None:
+        funding_arr = np.asarray(rp.funding, dtype="float64")
+        if len(funding_arr) != n:
+            raise ValueError("funding 陣列長度必須等於 K 線數")
 
     book = Book(rp.initial_capital, rp.commission_pct)
     eq = np.full(n, np.nan)
     exposure = np.zeros(n)
     pending: list[tuple[int, float, str]] = []      # (成交 bar, 目標曝險, 原因)
+    fills: list[tuple[int, int, str]] = []          # (bar, 方向, 原因)
     stop = np.nan
     hi_close = np.nan
-    mode = "armed"                                  # armed | wait_reset | wait_price
+    mode = "armed"                                  # armed | wait_reset | wait_price | wait_fill
     stop_exit_px = np.nan
     stop_bar = -10 ** 9
+    stop_events: list[dict] = []
+    open_stop: dict | None = None
+    regime_reset_since_stop = False
     paused = False
     pause_bar = -10 ** 9
     peak = rp.initial_capital
     n_stop = n_pause = n_entries = n_exits = 0
     funding_paid = 0.0
-    prev_on = False
 
     def fill_bar(i: int) -> int:
         return i + 1 + rp.exec_delay_bars
+
+    def after_stop_fill(i: int, px: float, level: float, decision_bar: int) -> None:
+        nonlocal mode, stop_exit_px, stop_bar, open_stop, regime_reset_since_stop
+        mode = _MODE_AFTER_STOP[rp.reentry]
+        stop_exit_px = px
+        stop_bar = i
+        regime_reset_since_stop = False
+        if stop_events and stop_events[-1].get("fill_bar") is None:
+            open_stop = stop_events[-1]          # 收盤觸發：決策時已記一筆，補上成交資訊
+            open_stop.update({"fill_bar": i, "fill_px": px, "reentry_bar": None, "reentry_px": None, "path": None})
+        else:
+            open_stop = {"decision_bar": decision_bar, "fill_bar": i, "fill_px": px, "stop_level": level,
+                         "reentry_bar": None, "reentry_px": None, "path": None}
+            stop_events.append(open_stop)
 
     for i in range(start_idx, n):
         t = idx[i]
@@ -179,39 +219,51 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
                 diff = 0.0
             if diff > 1e-12:
                 book.open(1, diff, o[i] * (1 + rp.slippage_pct), i, t)
+                fills.append((i, 1, reason))
                 if pos == 0:
                     hi_close = np.nan
                     stop = np.nan
                     n_entries += 1
+                    if open_stop is not None and open_stop["reentry_bar"] is None:
+                        open_stop["reentry_bar"] = i
+                        open_stop["reentry_px"] = o[i]
+                        open_stop["path"] = "regime_off" if regime_reset_since_stop else rp.reentry
+                        open_stop = None
             elif diff < -1e-12:
                 remain = -diff
+                px = o[i] * (1 - rp.slippage_pct)
                 for e in list(book.entries):
                     q = min(e.qty, remain)
-                    book.close(e, q, o[i] * (1 - rp.slippage_pct), i, t, reason)
+                    book.close(e, q, px, i, t, reason)
                     remain -= q
                     if remain <= 1e-12:
                         break
+                fills.append((i, -1, reason))
                 if book.position() <= 1e-12:
                     n_exits += 1
+                    if reason == "ATR停損":
+                        after_stop_fill(i, px, np.nan, i - 1 - rp.exec_delay_bars)
         # 2) 觸價型吊燈停損：前一根收盤算好的 stop，本根觸價成交
         if rp.atr_stop_mult > 0 and rp.stop_trigger == "low" and book.entries and not np.isnan(stop) and l[i] <= stop:
             px = min(o[i], stop) * (1 - rp.slippage_pct)
+            level = stop
             book.close_all(px, i, t, "ATR停損")
+            fills.append((i, -1, "ATR停損"))
             n_stop += 1
             n_exits += 1
-            stop_exit_px = px
-            stop_bar = i
             stop = np.nan
-            mode = {"reset": "wait_reset", "immediate": "armed", "close_above_stop": "wait_price"}[rp.reentry]
             pending = [p for p in pending if p[1] == 0.0]   # 已被停損，取消還沒成交的加碼
-        # 3) 收盤：追蹤停損、資金費率、回撤、目標曝險
+            after_stop_fill(i, px, level, i)
+        # 3) 收盤：資金費率、追蹤停損、回撤、目標曝險
         pos = book.position()
         eqv = book.equity(c[i])
-        if pos > 0 and rp.funding_rate_8h > 0:
-            cost = pos * c[i] * rp.funding_rate_8h * 3
-            book.realized -= cost
-            funding_paid += cost
-            eqv = book.equity(c[i])
+        if pos > 0:
+            rate = funding_arr[i] if funding_arr is not None else rp.funding_rate_8h * 3
+            if rate == rate and rate != 0.0:
+                cost = pos * c[i] * rate
+                book.realized -= cost
+                funding_paid += cost
+                eqv = book.equity(c[i])
         stop_hit_close = False
         if pos > 0 and rp.atr_stop_mult > 0 and not np.isnan(atr[i]):
             hi_close = c[i] if np.isnan(hi_close) else max(hi_close, c[i])
@@ -223,8 +275,10 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
         dd = 1 - eqv / peak if peak > 0 else 0.0
         on = bool(on_arr[i])
         if not on:
-            mode = "armed"
+            if mode != "wait_fill":
+                mode = "armed"
             stop_exit_px = np.nan
+            regime_reset_since_stop = True
             paused = False
             peak = eqv        # 趨勢重置：回撤高水位重新起算
         elif paused:
@@ -236,46 +290,53 @@ def simulate_regime(df: pd.DataFrame, in_regime, rp: RiskParams, start_idx: int)
             paused = True
             pause_bar = i
             n_pause += 1
-        # 重進門檻
+        exiting = any(p[1] == 0.0 for p in pending)
         if mode == "wait_price" and on and not np.isnan(stop_exit_px) and c[i] > stop_exit_px:
             mode = "armed"
-        can_enter = mode == "armed" and (i - stop_bar) >= rp.reentry_min_bars
-        want = on and not paused and (pos > 0 or can_enter)
+        can_enter = mode == "armed" and not exiting and (i - stop_bar) >= rp.reentry_min_bars
+        want = on and not paused and ((pos > 0 and not exiting) or can_enter)
         if stop_hit_close:
             want = False
         if not want:
             target = 0.0
-        elif rp.vol_target > 0 and not np.isnan(rvol[i]) and rvol[i] > 0:
-            if rp.vol_target_mode == "relative":
-                target = rp.max_exposure if np.isnan(vol_ref[i]) else min(rp.max_exposure, rp.vol_target * vol_ref[i] / rvol[i])
-            else:
-                target = min(rp.max_exposure, rp.vol_target / rvol[i])
         else:
             target = rp.max_exposure
+            if scale_arr is not None and scale_arr[i] == scale_arr[i]:
+                target *= float(np.clip(scale_arr[i], 0.0, 1.0))
+            if rp.vol_target > 0 and not np.isnan(rvol[i]) and rvol[i] > 0:
+                if rp.vol_target_mode == "relative":
+                    factor = 1.0 if np.isnan(vol_ref[i]) else min(1.0, rp.vol_target * vol_ref[i] / rvol[i] / rp.max_exposure)
+                else:
+                    factor = min(1.0, rp.vol_target / rvol[i] / rp.max_exposure)
+                target *= factor
         current = pos * c[i] / eqv if eqv > 0 else 0.0
-        # 已排隊但還沒成交的目標視為「即將達成」，避免延遲成交時重複排同一個目標
         ref = pending[-1][1] if pending else current
-        if stop_hit_close and pos > 0:
-            pending = [p for p in pending if p[1] == 0.0]
+        if stop_hit_close and pos > 0 and not exiting:
             pending.append((fill_bar(i), 0.0, "ATR停損"))
+            stop_events.append({"decision_bar": i, "fill_bar": None, "stop_level": stop})
             n_stop += 1
-            stop_exit_px = c[i]
-            stop_bar = i
             stop = np.nan
-            mode = {"reset": "wait_reset", "immediate": "armed", "close_above_stop": "wait_price"}[rp.reentry]
+            mode = "wait_fill"
         elif target == 0 and ref > 0:
-            pending.append((fill_bar(i), 0.0, "回撤暫停" if paused else "趨勢結束"))
+            pending.append((fill_bar(i), 0.0, "回撤暫停" if paused else ("曝險歸零" if on else "趨勢結束")))
         elif target > 0 and ref == 0:
             pending.append((fill_bar(i), target, "進場"))
         elif target > 0 and ref > 0 and abs(target - ref) > rp.rebalance_threshold:
             pending.append((fill_bar(i), target, "調整曝險"))
         eq[i] = eqv
         exposure[i] = current
-        prev_on = on
 
+    ex = exposure[start_idx:]
+    on_slice = on_arr[start_idx:]
     equity = pd.Series(eq, index=idx, name="strategy").iloc[start_idx:]
-    return BacktestResult(equity=equity, trades=book.trades_df(), round_trips=book.trips_df(), start_idx=start_idx,
-                          extra={"stops": n_stop, "dd_pauses": n_pause, "regime_entries": n_entries, "regime_exits": n_exits,
-                                 "funding_paid": funding_paid,
-                                 "avg_exposure": float(np.nanmean(exposure[start_idx:])),
-                                 "time_in_market": float(np.mean(exposure[start_idx:] > 0))})
+    extra = {
+        "stops": n_stop, "dd_pauses": n_pause, "regime_entries": n_entries, "regime_exits": n_exits,
+        "n_fills": len(fills), "funding_paid": funding_paid,
+        "avg_exposure": float(np.nanmean(ex)), "time_in_market": float(np.mean(ex > 0)),
+        "avg_exposure_in_regime": float(np.mean(ex[on_slice])) if on_slice.any() else 0.0,
+        "partial_days": int(np.sum((ex > 0) & (ex < rp.max_exposure * 0.99))),
+        "exposure_key": hashlib.md5(np.round(ex, 4).tobytes()).hexdigest(),
+        "fill_key": hashlib.md5(repr(fills).encode()).hexdigest(),
+        "stop_events": stop_events,
+    }
+    return BacktestResult(equity=equity, trades=book.trades_df(), round_trips=book.trips_df(), start_idx=start_idx, extra=extra)
