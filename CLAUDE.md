@@ -244,9 +244,10 @@ ema50_plain、BTC/USDT 與 ETH/USDT 現貨各 50%、費 0.10%/邊、滑 0.05%、
 - [x] 第 4 輪（使用者指示重開）：A3 分級曝險正式化 + 2×2 缺格、hold 型運行閘門 — 兩方向關閉；引擎 v4（lag_stop 記錄型、ratchet_up、帳目輸出）
 - [x] c：BTC/ETH 50/50 組合引擎與評估（十格全過、Sharpe 高於單標的平均）
 - [x] 通道版正式化 `abgt/strategies/atr_channel.py`；ema50_plain Pine 版 `pine/ema50_plain.pine`
-- [x] 現貨資料來源檢查；`live/paper.py` 紙上前向（上線 2026-10-01，需排程每日 00:05 UTC 執行）
+- [x] 現貨資料來源檢查；`live/paper.py` 紙上前向（上線 2026-10-01）；Windows 排程任務 `ABGT-paper` 每天 08:05 台北執行 `live/run_daily.bat`（已建立並測試，結果碼 0）
+- [x] ETH 決定：留在 50/50 組合跑前向，6 個月檢查點見 `live/README.md`
 - [ ] 前向累積 ≥ 6 個月後：guard_cohort_calibration（純量測）決定 X 是否存在；session_close_robustness（1h 合成不同收盤時點）
-- [ ] 第 5 輪（若開）：策略型方向四輪 36 個變體已探完，只剩量測型；不建議
+- [x] 第 5 輪：使用者決定不開（2026-09-23）
 - [x] 資金費率歷史資料接進 data.py；結論：永續執行成本讓基準 ETH 全掛、BTC IS 掉閘門，上線走現貨
 - [ ] 運行閘門 + Binance 測試網下單（`live/`）
 

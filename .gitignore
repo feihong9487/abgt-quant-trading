@@ -3,3 +3,4 @@ __pycache__/
 data/*.csv
 results/
 .env
+live/state/run.log

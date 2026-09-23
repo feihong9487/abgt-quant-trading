@@ -28,13 +28,22 @@ cd D:/feihong/tradingView/ABGT
 
 `run` 是冪等的：同一天重跑不會重複記帳；漏跑幾天再跑會依序補上（用當時的開盤價成交，與回測語意相同）。
 
-## 排程（Windows 工作排程器，每天台北 08:05 = 00:05 UTC）
+## 排程（已建立，2026-09-23）
+
+Windows 工作排程器任務 `ABGT-paper`：每天台北 08:05（= 00:05 UTC）執行 `live/run_daily.bat`（跑 `paper.py run --verbose`、輸出到 `live/state/run.log`、帳本有變動就 commit）。機器關機或睡眠時不會跑，但 `run` 會在下次執行時依序補上漏掉的日子（用當時的開盤價成交，與回測語意相同）。
 
 ```powershell
-schtasks /create /tn "ABGT-paper" /sc daily /st 08:05 /tr "D:\feihong\tradingView\ABGT\.venv\Scripts\python.exe D:\feihong\tradingView\ABGT\live\paper.py run --verbose >> D:\feihong\tradingView\ABGT\live\state\run.log 2>&1"
+schtasks /query /tn "ABGT-paper" /fo list     # 看狀態與下次執行時間
+schtasks /run /tn "ABGT-paper"                # 手動跑一次
+schtasks /delete /tn "ABGT-paper" /f          # 移除
 ```
 
-移除：`schtasks /delete /tn "ABGT-paper" /f`。
+## ETH 的決定（2026-09-23）
+
+現貨真實成本下 ETH 單獨對持有的邊距只剩 0.05 Sharpe，但 BTC/ETH 50/50 組合十格全過、組合 Sharpe 五個區間都高於單標的平均（分散紅利 +0.06～+0.12）。**前向照組合口徑跑，ETH 留著** — 前向測試的目的就是量這條薄邊距。事前登記的 6 個月檢查點：
+- 用現貨日線對前向區間跑 `evaluate_variant.py --variant ema50_plain --symbols ETH/USDT`，若 ETH 單獨對持有的 Sharpe Δ < −0.10 且 BTC 那半邊 ≥ 0 → 下一期改 BTC 100%；
+- 若 ETH 那半邊只是「與持有持平」而組合 Sharpe 仍高於 BTC 單獨 → 留。
+判定只在檢查點做，期中不因單月表現調整。
 
 ## 狀態檔
 
