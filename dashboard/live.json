@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-01T13:26:11+08:00",
+ "updated_at": "2026-10-01T13:31:00+08:00",
  "schedule": "每天 08:05 台北（00:05 UTC）· 排程 ABGT-paper",
  "testnet": {
   "venue": "binance spot testnet (testnet.binance.vision)",
@@ -16,29 +16,29 @@
    {
     "date": "2026-09-30",
     "status": "done",
-    "nav": 9901.059884000002,
+    "nav": 9991.481068000001,
     "ok": true,
     "n_fills": 2,
     "exposure": {
-     "BTC/USDT": 0.49992133309876663,
-     "ETH/USDT": 0.5000748785997343
+     "BTC/USDT": 0.49989286896580043,
+     "ETH/USDT": 0.500103377016177
     },
     "error": null,
-    "finished": "2026-10-01T01:53:57+00:00"
+    "finished": "2026-10-01T05:30:55+00:00"
    }
   ],
   "last": {
    "date": "2026-09-30",
    "status": "done",
-   "nav": 9901.059884000002,
+   "nav": 9991.481068000001,
    "ok": true,
    "n_fills": 2,
    "exposure": {
-    "BTC/USDT": 0.49992133309876663,
-    "ETH/USDT": 0.5000748785997343
+    "BTC/USDT": 0.49989286896580043,
+    "ETH/USDT": 0.500103377016177
    },
    "error": null,
-   "finished": "2026-10-01T01:53:57+00:00"
+   "finished": "2026-10-01T05:30:55+00:00"
   },
   "regime": {
    "BTC": {
