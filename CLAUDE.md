@@ -248,6 +248,12 @@ ema50_plain、BTC/USDT 與 ETH/USDT 現貨各 50%、費 0.10%/邊、滑 0.05%、
 
 只連 `testnet.binance.vision`（URL 硬檢查、無正式網下單路徑）；決策用正式網公開日線、成交在測試網；子帳記帳、冪等 clientOrderId、只在交易所明確回「找不到」時才重下、先賣後買、`--maker-first N`、`live/KILL` 停單 / `--flatten`、對帳。沒有金鑰自動 dry-run。2026-10-01 上線（`.env` 解析容忍全形「＝」）；帳本 `live/state/executor.json`。
 
+### Dashboard 每日自動同步（2026-10-01）
+
+`run_daily.bat` 第 3、4 步：`build_dashboard.py` 重建本地 dashboard，`live/drive_sync.py` 把 `dashboard/live.json` 寫進 Google Drive。
+帳號：Drive 電腦版登入 tmes.104010；claude.ai 的 Google Drive connector 是 jasper1689。jasper 的「ABGT」資料夾（id `1m_g-d2SXMlbhlfAUsdHIFpzjOYixziYs`）共用給 tmes（編輯者），tmes 在我的雲端硬碟加捷徑 → 本機實體路徑 `G:\.shortcut-targets-by-id\<id>\ABGTbgt_live.json`（原地覆寫，file id 不變）。
+claude.ai 頁面宣告 `mcp: Google Drive [search_files, download_file_content]`，`watchTool` 每 10 分鐘搜尋、`modifiedTime` 變了才下載；三個來源（內嵌快照 / db `live/current` / Drive）取 `updated_at` 最新者。前提：電腦登入中且 Drive 電腦版在跑；否則 drive_sync 略過、頁面顯示上一次的資料。
+
 ### 結論（2026-09-23）
 
 1. **APEX 輸給持有不是 bug，是設計**：每筆風險 1%、3.7 年 11 回合，全贏也只有 +27%。ATR 風險式倉位在 5 倍牛市裡結構上追不上持有；它的價值在回撤（−5.4% vs −53%），不在報酬。

@@ -334,9 +334,17 @@ function lineChart(canvas, labels, sets, prev) {
       plugins: {legend: {display: false}, tooltip: {callbacks: {label: (c) => `${c.dataset.label} ${money(c.parsed.y)}`}}},
       scales: {x: {grid: {display: false}, ticks: {color: css('--ink-3'), maxTicksLimit: 6}}, y: {grid: {color: css('--line')}, ticks: {color: css('--ink-3')}}}}});
 }
+// 三個來源取 updated_at 最新者：頁面內嵌快照 / artifact db live/current / Google Drive abgt_live.json
+let liveSrc = '快照', driveNote = '';
+const SRC_RANK = {'快照': 0, 'db': 1, 'Google Drive': 2};
+function acceptLive(cand, src) {
+  if (!cand || !cand.updated_at) return;
+  const a = Date.parse(cand.updated_at), b = Date.parse((LIVE || {}).updated_at || 0) || 0;
+  if (a > b || (a === b && SRC_RANK[src] > SRC_RANK[liveSrc])) { LIVE = cand; liveSrc = src; renderFront(); }
+}
 function frontUpd() {
   const L = LIVE || {};
-  $('#front-upd').textContent = L.updated_at ? `帳本同步於 ${ago(L.updated_at)} · ${L.schedule || ''}` : '';
+  $('#front-upd').textContent = (L.updated_at ? `來源 ${liveSrc} · 帳本更新於 ${ago(L.updated_at)} · ${L.schedule || ''}` : '') + (driveNote ? ` · ${driveNote}` : '');
 }
 function renderFront() {
   const L = LIVE || {}, T = L.testnet, P = L.paper;
@@ -420,8 +428,54 @@ setInterval(frontUpd, 30000);
     if (!window.claude || typeof window.claude.use !== 'function') return;
     const db = await window.claude.use('db');
     if (!db) return;
-    db.doc('live/current').onSnapshot((snap) => { if (snap.exists) { LIVE = Object.assign({}, snap.data()); renderFront(); } }, () => {});
+    db.doc('live/current').onSnapshot((snap) => { if (snap.exists) acceptLive(Object.assign({}, snap.data()), 'db'); }, () => {});
   } catch (_) {}
+})();
+// Google Drive：每日排程把 abgt_live.json 寫進「我的雲端硬碟/ABGT」，頁面用檢視者自己的 Google Drive connector 讀
+const DRIVE = 'Google Drive';
+const DRIVE_FIX = {
+  needs_reauth: 'Google Drive 連線過期：到 claude.ai 設定 → Connectors 重新連線',
+  server_not_connected: '沒有 Google Drive connector：到 claude.ai 設定 → Connectors 加入',
+  selection_required: '有多個 Google Drive connector，請在提示中選一個',
+  not_in_manifest: '這頁未獲准讀 Google Drive（可在頁面權限中重新允許）',
+  blocked_by_policy: '組織政策封鎖了 Google Drive 讀取',
+  approval_required: '組織政策要求逐次核准，頁面無法讀 Google Drive',
+};
+function driveErr(e) {
+  const code = (e && e.code) || 'upstream_error';
+  driveNote = DRIVE_FIX[code] || (code === 'server_unavailable' ? 'Google Drive 暫時無法連線，顯示上次的資料' : `Google Drive 讀取失敗（${code}）`);
+  if (['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required'].includes(code) && liveSrc === 'Google Drive') {
+    LIVE = DATA.live || {}; liveSrc = '快照'; renderFront();     // 授權拒絕：撤回 Drive 來的資料
+  } else frontUpd();
+}
+function b64json(b64) {
+  const bin = atob(b64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+}
+(async () => {
+  try {
+    if (!window.claude || typeof window.claude.use !== 'function') return;
+    const mcp = await window.claude.use('mcp');
+    if (!mcp) return;
+    let loadedKey = '';
+    mcp.watchTool(DRIVE, 'search_files', {query: "title = 'abgt_live.json' and owner = 'me'", excludeContentSnippets: true, pageSize: 5}, async (ev) => {
+      if (ev.type === 'error') { driveErr(ev.error); return; }
+      const files = ((ev.result && ev.result.payload) || {}).files || [];
+      if (!files.length) { driveNote = 'Google Drive 裡還沒有 abgt_live.json'; frontUpd(); return; }
+      const f = files.slice().sort((a, b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime)))[0];
+      const key = `${f.id}@${f.modifiedTime}`;
+      if (key === loadedKey) return;
+      try {
+        const r = await mcp.callTool(DRIVE, 'download_file_content', {fileId: f.id});
+        const p = r.payload || {};
+        if (!p.content) throw {code: 'tool_error'};
+        loadedKey = key; driveNote = '';
+        acceptLive(b64json(p.content), 'Google Drive');
+        frontUpd();
+      } catch (e) { driveErr(e); }
+    }, {refetchInterval: 600000});
+  } catch (e) { driveErr(e); }
 })();
 
 // ---------- baseline & directions ----------
