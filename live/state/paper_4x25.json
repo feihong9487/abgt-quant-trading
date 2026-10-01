@@ -1,0 +1,43 @@
+{
+  "created": "2026-10-01T05:25:37+00:00",
+  "config": {
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT",
+      "BNB/USDT"
+    ],
+    "weights": {
+      "BTC/USDT": 0.25,
+      "ETH/USDT": 0.25,
+      "SOL/USDT": 0.25,
+      "BNB/USDT": 0.25
+    },
+    "capital": 10000.0,
+    "fee": 0.001,
+    "slip": 0.0005,
+    "ema_len": 50,
+    "rebalance_threshold": 0.15,
+    "strategy": "ema50_plain",
+    "exchange": "binance spot",
+    "start": "2026-10-01",
+    "note": "收盤決策、次日開盤成交；運行閘門只記錄不動作（第 4 輪結論）",
+    "role": "記錄型分帳（不影響已登記的 BTC/ETH 50/50 帳本）；6 個月檢查點比較逐日 Sharpe 差、回撤、換手、實際成本",
+    "name": "4×25%"
+  },
+  "cash": 10000.0,
+  "positions": {
+    "BTC/USDT": 0.0,
+    "ETH/USDT": 0.0,
+    "SOL/USDT": 0.0,
+    "BNB/USDT": 0.0
+  },
+  "pending": {},
+  "bh_qty": {},
+  "started": false,
+  "last_processed": null,
+  "history": [],
+  "fills": [],
+  "ratio_hwm": 1.0,
+  "nav_hwm": 10000.0
+}

@@ -415,7 +415,14 @@ function renderFront() {
         <dt>明天的單</dt><dd>${pend}</dd></dl>
       ${P.series.length >= 2 ? '<div class="minichart"><canvas id="pp-chart" role="img" aria-label="紙上 NAV 與持有"></canvas></div>' : ''}`;
   }
+  const PS = L.papers || [];
+  const ledgers = PS.length >= 2 ? `<div class="muted" style="font-size:11px;margin-top:16px;letter-spacing:.06em">帳本對照 · 同上線日、同成本</div>
+    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>帳本</th><th class="num">NAV</th><th class="num">持有</th><th class="num">比值</th><th class="num">回撤</th><th class="num">天 / 成交</th></tr></thead><tbody>` +
+    PS.map(p => `<tr><td style="white-space:normal">${esc(p.name)}</td><td class="num">${p.nav == null ? '尚未起算' : money(p.nav, 0)}</td><td class="num">${money(p.bh_nav, 0)}</td>` +
+      `<td class="num ${p.ratio == null ? '' : (p.ratio >= 1 ? 'up' : 'down')}">${p.ratio == null ? '—' : num(p.ratio, 4)}</td><td class="num">${pct(p.nav_dd)}</td><td class="num">${p.days} / ${p.n_fills}</td></tr>`).join('') +
+    '</tbody></table></div>' : '';
   $('#pp-panel').innerHTML = `<div class="panel-h"><h2>紙上前向</h2><span class="chip acc">上線 <b>${esc(P ? P.start : '—')}</b></span></div>${body}
+    ${ledgers}
     <div class="muted" style="font-size:11px;margin-top:16px;letter-spacing:.06em">趨勢狀態 · close 對 EMA50（刻度 ±30%）</div><div class="regs">${regs || '<span class="muted">—</span>'}</div>`;
   if (P && P.last && P.series.length >= 2) ppChart = lineChart($('#pp-chart'), P.series.map(r => r.d), [
     {label: '紙上 NAV', data: P.series.map(r => r.nav), borderColor: css('--s1'), borderWidth: 2, pointRadius: 0},

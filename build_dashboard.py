@@ -221,6 +221,20 @@ def live_snapshot() -> dict:
             "last": ({k: h[-1][k] for k in ("date", "nav", "bh_nav", "ratio", "ratio_dd", "nav_dd", "roll90", "roll180", "roll365")} | {"pending": h[-1].get("pending")}) if h else None,
             "series": [{"d": x["date"], "nav": round(x["nav"], 2), "bh": round(x["bh_nav"], 2)} for x in h],
         }
+    papers = []
+    for fname, label in (("paper.json", "BTC/ETH 50/50（登記）"), ("paper_4x25.json", "BTC/ETH/SOL/BNB 4×25%（記錄）")):
+        fp = os.path.join(ROOT, "live", "state", fname)
+        if not os.path.exists(fp):
+            continue
+        st = jload(fp)
+        h = st.get("history", [])
+        last = h[-1] if h else None
+        papers.append({"name": label, "symbols": [x.split("/")[0] for x in st["config"]["symbols"]], "start": st["config"]["start"],
+                       "days": len(h), "n_fills": len(st.get("fills", [])),
+                       "nav": last["nav"] if last else None, "bh_nav": last["bh_nav"] if last else None,
+                       "ratio": last["ratio"] if last else None, "nav_dd": last["nav_dd"] if last else None,
+                       "capital": st["config"]["capital"]})
+    out["papers"] = papers
     return out
 
 

@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-01T13:23:25+08:00",
+ "updated_at": "2026-10-01T13:26:11+08:00",
  "schedule": "每天 08:05 台北（00:05 UTC）· 排程 ABGT-paper",
  "testnet": {
   "venue": "binance spot testnet (testnet.binance.vision)",
@@ -104,5 +104,39 @@
   "n_fills": 0,
   "last": null,
   "series": []
- }
+ },
+ "papers": [
+  {
+   "name": "BTC/ETH 50/50（登記）",
+   "symbols": [
+    "BTC",
+    "ETH"
+   ],
+   "start": "2026-10-01",
+   "days": 0,
+   "n_fills": 0,
+   "nav": null,
+   "bh_nav": null,
+   "ratio": null,
+   "nav_dd": null,
+   "capital": 10000.0
+  },
+  {
+   "name": "BTC/ETH/SOL/BNB 4×25%（記錄）",
+   "symbols": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "BNB"
+   ],
+   "start": "2026-10-01",
+   "days": 0,
+   "n_fills": 0,
+   "nav": null,
+   "bh_nav": null,
+   "ratio": null,
+   "nav_dd": null,
+   "capital": 10000.0
+  }
+ ]
 }
