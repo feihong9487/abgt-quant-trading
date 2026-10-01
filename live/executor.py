@@ -175,8 +175,8 @@ def find_order(ex, symbol: str, cid: str):
         return None
 
 
-def apply_fill(st: dict, symbol: str, order: dict) -> dict:
-    """依成交回報更新子帳；手續費依幣別扣在對應資產。回傳成交紀錄。"""
+def apply_fill(st: dict, symbol: str, order: dict, extra: dict | None = None) -> dict:
+    """依成交回報更新子帳；手續費依幣別扣在對應資產。回傳成交紀錄（extra = 成交品質欄位）。"""
     sl = st["sleeve"]
     base = symbol.split("/")[0]
     filled = float(order.get("filled") or 0.0)
@@ -203,6 +203,12 @@ def apply_fill(st: dict, symbol: str, order: dict) -> dict:
     rec = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"), "symbol": symbol, "side": order["side"], "type": order.get("type"),
            "qty": filled, "avg": float(order.get("average") or (cost / filled)), "cost": cost, "fee_base": fee_base, "fee_quote": fee_quote,
            "fee_other": fee_other, "id": order.get("id"), "client_id": order.get("clientOrderId")}
+    if extra:
+        rec.update(extra)
+        ref = extra.get("ref_mid")
+        if ref:
+            sign = 1 if order["side"] == "buy" else -1
+            rec["slip_bps"] = sign * (rec["avg"] / ref - 1) * 1e4      # 正值 = 成本（買貴 / 賣便宜）
     st["fills"].append(rec)
     return rec
 
@@ -211,6 +217,8 @@ def execute(ex, st: dict, day: str, o: dict, maker_first: int) -> list[dict]:
     s, side = o["symbol"], o["side"]
     recs = []
     remaining = o["qty"]
+    ref = o.get("price_ref")
+    t0 = time.time()
     if maker_first > 0:
         cid = client_id(day, s, side, "m")
         prev = find_order(ex, s, cid)
@@ -235,7 +243,8 @@ def execute(ex, st: dict, day: str, o: dict, maker_first: int) -> list[dict]:
                     ex.cancel_order(prev["id"], s)
                     prev = ex.fetch_order(prev["id"], s)
         if prev is not None and float(prev.get("filled") or 0) > 0 and not any(f.get("id") == prev["id"] for f in st["fills"]):
-            recs.append(apply_fill(st, s, prev))
+            recs.append(apply_fill(st, s, prev, {"leg": "maker", "ref_mid": ref, "wait_s": round(time.time() - t0, 1),
+                                                 "target_qty": o["qty"], "filled_frac": float(prev.get("filled") or 0) / o["qty"] if o["qty"] else None}))
             save_state(st)
         if prev is not None:
             remaining -= float(prev.get("filled") or 0.0)
@@ -246,7 +255,7 @@ def execute(ex, st: dict, day: str, o: dict, maker_first: int) -> list[dict]:
     if prev is not None:
         log(f"{s} 今天的市價單 {cid} 已存在（{prev['status']}），不重下")
         if prev["status"] == "closed" and not any(f.get("id") == prev["id"] for f in st["fills"]):
-            recs.append(apply_fill(st, s, prev))
+            recs.append(apply_fill(st, s, prev, {"leg": "market", "ref_mid": ref, "target_qty": o["qty"]}))
         return recs
     if side == "sell":
         remaining = min(remaining, st["sleeve"]["qty"][s])
@@ -263,7 +272,8 @@ def execute(ex, st: dict, day: str, o: dict, maker_first: int) -> list[dict]:
             break
         time.sleep(2)
         order = ex.fetch_order(order["id"], s)
-    recs.append(apply_fill(st, s, order))
+    recs.append(apply_fill(st, s, order, {"leg": "market", "ref_mid": ref, "wait_s": round(time.time() - t0, 1), "target_qty": o["qty"],
+                                          "after_maker": maker_first > 0}))
     return recs
 
 
@@ -294,6 +304,34 @@ def mid_prices(ex) -> dict:
         t = ex.fetch_ticker(s)
         out[s] = (t["bid"] + t["ask"]) / 2 if t.get("bid") and t.get("ask") else t["last"]
     return out
+
+
+def detect_reset(ex, st: dict) -> dict | None:
+    """帳戶餘額比子帳少 → 測試網重置過（餘額回到預設、訂單清空）。回傳帳戶餘額摘要；正常回 None。"""
+    bal = ex.fetch_balance()
+    sl = st["sleeve"]
+    short = []
+    for s in SYMBOLS:
+        base = s.split("/")[0]
+        have = float(bal.get(base, {}).get("total") or 0.0)
+        if sl["qty"][s] > have + 1e-9:
+            short.append(f"{base} 子帳 {sl['qty'][s]:.6f} > 帳戶 {have:.6f}")
+    usdt = float(bal.get("USDT", {}).get("total") or 0.0)
+    if sl["usdt"] > usdt + 1e-6:
+        short.append(f"USDT 子帳 {sl['usdt']:.2f} > 帳戶 {usdt:.2f}")
+    if not short:
+        return None
+    return {"short": short, "usdt": usdt, "balances": {k: float(bal.get(k, {}).get("total") or 0.0) for k in ("USDT", "BTC", "ETH", "BNB")}}
+
+
+def rebuild_after_reset(st: dict, info: dict, day: str) -> None:
+    """封存舊子帳、以 min(原資本, 帳戶 USDT × 0.99) 重建；成交與執行紀錄保留，標記重置。"""
+    cap = min(float(st["capital"]), info["usdt"] * 0.99)
+    st.setdefault("resets", []).append({"detected": datetime.now(timezone.utc).isoformat(timespec="seconds"), "day": day,
+                                        "old_sleeve": json.loads(json.dumps(st["sleeve"])), "account": info["balances"],
+                                        "why": info["short"], "new_capital": cap})
+    st["sleeve"] = {"usdt": cap, "qty": {s: 0.0 for s in SYMBOLS}}
+    st["capital_current"] = cap
 
 
 # ---------- 指令 ----------
@@ -375,11 +413,29 @@ def cmd_run(args) -> int:
             f"{o['symbol']} {o['side']} {o['qty']:.6f}（目前 {o['current']:.1%} → 目標 {o['target']:.0%}，參考價 {o['price_ref']:,.2f}）"))
     if dry:
         return 0
+    import ccxt
+    reset_info = None
+    try:
+        reset_info = detect_reset(ex, st)
+    except ccxt.AuthenticationError as e:
+        st["runs"][day] = {"status": "auth_error", "started": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                           "error": f"金鑰無效（測試網重置後常見，要重產）：{str(e)[:200]}", "decision": d}
+        save_state(st)
+        log(st["runs"][day]["error"])
+        return 5
+    if reset_info:
+        log("偵測到測試網重置：" + "；".join(reset_info["short"]) + " → 封存舊子帳並重建")
+        rebuild_after_reset(st, reset_info, day)
+        save_state(st)
+        prices = mid_prices(ex)
+        orders = plan_orders(st, prices, targets, markets)
+        for o in orders:
+            log(f"（重建後）{o['symbol']} {o['side']} {o['qty']:.6f}" if not o.get("skip") else f"（重建後）{o['symbol']} 略過：{o['skip']}")
     prev = st["runs"].get(day) or {}
     st["runs"][day] = {"status": "running", "started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "decision": d,
                        "targets": targets, "orders": [{k: v for k, v in o.items() if not callable(v)} for o in orders],
                        "prev_fills": [f for f in prev.get("fills", []) + prev.get("prev_fills", []) if f],   # --force 重跑不丟前一次的成交
-                       "attempt": int(prev.get("attempt", 0)) + 1}
+                       "attempt": int(prev.get("attempt", 0)) + 1, "reset": bool(reset_info)}
     save_state(st)
     fills = []
     try:

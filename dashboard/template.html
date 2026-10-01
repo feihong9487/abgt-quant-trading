@@ -378,18 +378,21 @@ function renderFront() {
       <dl class="kv"><dt>最後決策 K 線</dt><dd class="mono">${esc(last.date || '—')}${last.finished ? `（${ago(last.finished)}完成）` : ''}</dd>
         <dt>對帳</dt><dd>${last.ok == null ? '—' : (last.ok ? '<span class="up">✓ 帳戶 ≥ 子帳</span>' : '<span class="down">✗ 不符，看 live/state/run.log</span>')}</dd>
         <dt>累計</dt><dd>${runs.length} 次執行 · ${nFills} 筆成交${last.error ? ` · <span class="down">${esc(last.error)}</span>` : ''}</dd>
-        <dt>下單方式</dt><dd>先掛 LIMIT_MAKER 60 秒，未成交轉市價；測試網手續費為 0</dd></dl>
+        <dt>下單方式</dt><dd>先掛 LIMIT_MAKER 60 秒，未成交轉市價；測試網手續費為 0</dd>
+        <dt>成交品質</dt><dd>${T.quality && T.quality.n ? `平均滑價 <span class="mono">${(T.quality.avg_slip_bps >= 0 ? '+' : '') + T.quality.avg_slip_bps.toFixed(1)}</span> bps（${T.quality.n} 筆，對下單時中間價）` : '從下一筆成交開始記錄'}${T.quality && T.quality.maker_share != null ? ` · 掛單成交 ${pct(T.quality.maker_share, 0).replace('+', '')}` : ''}</dd>
+        ${(T.resets || []).length ? `<dt>測試網重置</dt><dd>${T.resets.length} 次，已自動重建（最近 ${esc(T.resets.at(-1).day)}）</dd>` : ''}</dl>
       ${runs.length >= 2 ? '<div class="minichart"><canvas id="tn-chart" role="img" aria-label="測試網子帳 NAV"></canvas></div>'
         : `<div class="empty">NAV 曲線在累積 2 次執行後顯示（目前 ${runs.length} 次）。</div>`}`;
     if (runs.length >= 2) tnChart = lineChart($('#tn-chart'), runs.map(r => r.date),
       [{label: '子帳 NAV', data: runs.map(r => r.nav), borderColor: css('--s1'), borderWidth: 2, pointRadius: 0}], tnChart);
     const F = (T.fills || []).slice().reverse();
-    $('#tn-fills').innerHTML = '<thead><tr><th>成交時間（UTC）</th><th>標的</th><th>方向</th><th>類型</th><th class="num">數量</th><th class="num">均價</th><th class="num">金額 USDT</th><th>clientOrderId</th></tr></thead><tbody>' +
+    $('#tn-fills').innerHTML = '<thead><tr><th>成交時間（UTC）</th><th>標的</th><th>方向</th><th>類型</th><th class="num">數量</th><th class="num">均價</th><th class="num">金額 USDT</th><th class="num">滑價 bps</th><th class="num">等待 s</th><th>clientOrderId</th></tr></thead><tbody>' +
       (F.length ? F.map(f => `<tr><td class="mono">${esc(String(f.time).replace('T', ' ').replace('+00:00', ''))}</td><td>${esc(f.symbol)}</td>` +
         `<td class="${f.side === 'buy' ? 'up' : 'down'}">${f.side === 'buy' ? '買' : '賣'}</td>` +
         `<td>${f.type === 'limit' ? '<span class="chip good">掛單</span>' : '<span class="chip">市價</span>'}</td>` +
-        `<td class="num">${num(f.qty, 5)}</td><td class="num">${money(f.avg)}</td><td class="num">${money(f.cost)}</td><td class="mono muted">${esc(f.client_id || '')}</td></tr>`).join('')
-        : '<tr><td colspan="8" class="muted">尚無成交</td></tr>') + '</tbody>';
+        `<td class="num">${num(f.qty, 5)}</td><td class="num">${money(f.avg)}</td><td class="num">${money(f.cost)}</td><td class="num ${f.slip_bps == null ? '' : (f.slip_bps > 0 ? 'down' : 'up')}">${f.slip_bps == null ? '—' : (f.slip_bps >= 0 ? '+' : '') + f.slip_bps.toFixed(1)}</td>` +
+        `<td class="num">${f.wait_s == null ? '—' : num(f.wait_s, 0)}</td><td class="mono muted">${esc(f.client_id || '')}</td></tr>`).join('')
+        : '<tr><td colspan="10" class="muted">尚無成交</td></tr>') + '</tbody>';
   }
   // ---- paper + regime ----
   const reg = (T && T.regime) || {};

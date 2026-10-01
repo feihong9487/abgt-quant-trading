@@ -209,7 +209,12 @@ def live_snapshot() -> dict:
             "regime": {k.split("/")[0]: {"on": v["on"], "close": v["close"], "ema": v["ema"], "dist": v["dist_pct"], "bar": v["bar"]} for k, v in dec.items()},
             "reconcile_rows": (last.get("reconcile") or {}).get("rows"),
             "fills": [{"time": f["time"], "symbol": f["symbol"].split("/")[0], "side": f["side"], "type": f.get("type"), "qty": f["qty"],
-                       "avg": f["avg"], "cost": f["cost"], "client_id": f.get("client_id")} for f in st.get("fills", [])][-20:],
+                       "avg": f["avg"], "cost": f["cost"], "client_id": f.get("client_id"),
+                       "slip_bps": f.get("slip_bps"), "leg": f.get("leg"), "wait_s": f.get("wait_s")} for f in st.get("fills", [])][-20:],
+            "resets": [{"day": r["day"], "new_capital": r.get("new_capital")} for r in st.get("resets", [])],
+            "quality": {"n": len([f for f in st.get("fills", []) if f.get("slip_bps") is not None]),
+                        "avg_slip_bps": (lambda q: sum(q) / len(q) if q else None)([f["slip_bps"] for f in st.get("fills", []) if f.get("slip_bps") is not None]),
+                        "maker_share": (lambda m: sum(1 for f in m if f["leg"] == "maker") / len(m) if m else None)([f for f in st.get("fills", []) if f.get("leg")])},
         }
     pp = os.path.join(ROOT, "live", "state", "paper.json")
     if os.path.exists(pp):

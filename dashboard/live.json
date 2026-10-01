@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-01T13:31:00+08:00",
+ "updated_at": "2026-10-01T13:31:24+08:00",
  "schedule": "每天 08:05 台北（00:05 UTC）· 排程 ABGT-paper",
  "testnet": {
   "venue": "binance spot testnet (testnet.binance.vision)",
@@ -82,7 +82,10 @@
     "qty": 0.05926,
     "avg": 83525.98,
     "cost": 4949.7495748,
-    "client_id": "abgt-20260930-BTC-bm"
+    "client_id": "abgt-20260930-BTC-bm",
+    "slip_bps": null,
+    "leg": null,
+    "wait_s": null
    },
    {
     "time": "2026-10-01T01:53:44+00:00",
@@ -92,9 +95,18 @@
     "qty": 1.8407,
     "avg": 2689.31,
     "cost": 4950.212917,
-    "client_id": "abgt-20260930-ETH-b"
+    "client_id": "abgt-20260930-ETH-b",
+    "slip_bps": null,
+    "leg": null,
+    "wait_s": null
    }
-  ]
+  ],
+  "resets": [],
+  "quality": {
+   "n": 0,
+   "avg_slip_bps": null,
+   "maker_share": null
+  }
  },
  "paper": {
   "start": "2026-10-01",
