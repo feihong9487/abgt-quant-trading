@@ -153,16 +153,56 @@ tr.base td{background:var(--accent-wash)}
 .dir .k{font-family:var(--mono);font-weight:600;color:var(--accent-2);white-space:nowrap}
 .dir .p{color:var(--ink-3)}
 .foot{margin-top:28px;color:var(--ink-4);font-size:12px;line-height:1.6}
+/* front line (paper + testnet) */
+.g2l{grid-template-columns:1.15fr 1fr}
+@media (max-width:900px){.g2l{grid-template-columns:1fr}}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.navrow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.navrow .sub2{font-size:12px;color:var(--ink-3)}
+.xbars{display:grid;gap:8px;margin-top:14px}
+.xbar{display:grid;grid-template-columns:44px 1fr 120px;align-items:center;gap:10px;font-size:12px}
+.xbar .bar{position:relative;height:10px;border-radius:5px;background:var(--line);overflow:visible}
+.xbar .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:5px}
+.xbar .bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2)}
+.xbar .n{text-align:right;font-family:var(--mono);color:var(--ink-2)}
+.regs{display:grid;gap:10px;margin-top:12px}
+.reg{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;font-size:12px}
+.reg .meta{color:var(--ink-3);font-family:var(--mono);font-size:11px}
+.dist{position:relative;height:10px;border-radius:5px;background:var(--line)}
+.dist .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--ink-4)}
+.dist i{position:absolute;top:0;bottom:0;border-radius:5px}
+.minichart{position:relative;height:150px;margin-top:12px}
+.empty{border:1px dashed var(--line-2);border-radius:var(--r-in);padding:14px;color:var(--ink-3);font-size:12px;margin-top:12px;line-height:1.6}
+.recon{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+.recon div{border:1px solid var(--line);border-radius:var(--r-in);padding:8px 10px;font-size:11px;color:var(--ink-3)}
+.recon b{display:block;font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:600;margin-top:2px}
+.recon .okm{color:var(--good)} .recon .bad{color:var(--bad)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--ink-3)}
+@media (max-width:640px){.recon{grid-template-columns:1fr}.xbar{grid-template-columns:40px 1fr 104px}}
+/* phone: let grid children shrink, wrap long text */
+.grid>*{min-width:0}
+.panel{min-width:0;overflow-wrap:anywhere}
+@media (max-width:640px){.wrap{padding-inline:16px}.top .live{margin-left:0}.big{font-size:34px}.kv{grid-template-columns:1fr}.kv dd{margin-bottom:4px}.phase{grid-template-columns:72px 1fr 52px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 <div class="top"><div class="wrap">
-  <div class="brand"><div class="mark">Σ</div><div><h1>ABGT Console</h1><div class="sub">曝險型趨勢策略 · 多代理優化迴圈</div></div></div>
+  <div class="brand"><div class="mark">Σ</div><div><h1>ABGT Console</h1><div class="sub">曝險型趨勢策略 · 紙上前向 + 測試網執行 · 優化迴圈</div></div></div>
   <div class="chips" id="top-chips"></div>
   <div class="live"><span class="dot" id="live-dot"></span><span id="live-text">連線中…</span></div>
 </div></div>
 
 <div class="wrap">
+<section>
+  <div class="panel-h"><h2>前線 · 紙上前向與測試網</h2><span class="tag" id="front-upd"></span></div>
+  <div class="grid g2l">
+    <div class="panel" id="tn-panel"></div>
+    <div class="panel" id="pp-panel"></div>
+  </div>
+  <div class="tablewrap" style="margin-top:14px"><table id="tn-fills"></table></div>
+</section>
+
 <section class="grid g3">
   <div class="panel" id="loop-panel"></div>
   <div class="panel" id="base-panel"></div>
@@ -275,6 +315,113 @@ setInterval(renderLive, 10000);
       else { liveMode = 'snapshot'; renderLive(); }
     }, () => { liveMode = 'snapshot'; renderLive(); });
   } catch (_) { liveMode = 'snapshot'; renderLive(); }
+})();
+
+// ---------- front line: testnet executor + paper forward ----------
+let LIVE = DATA.live || {};
+let tnChart, ppChart;
+const money = (x, d = 2) => x == null ? '—' : Number(x).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+function statusChip(st) {
+  if (st === 'done') return '<span class="chip good">✓ 完成</span>';
+  if (st === 'error') return '<span class="chip bad">✗ 錯誤</span>';
+  if (st === 'running') return '<span class="chip warn">● 執行中</span>';
+  return '<span class="chip">—</span>';
+}
+function lineChart(canvas, labels, sets, prev) {
+  if (prev) prev.destroy();
+  return new Chart(canvas, {type: 'line', data: {labels, datasets: sets},
+    options: {responsive: true, maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
+      plugins: {legend: {display: false}, tooltip: {callbacks: {label: (c) => `${c.dataset.label} ${money(c.parsed.y)}`}}},
+      scales: {x: {grid: {display: false}, ticks: {color: css('--ink-3'), maxTicksLimit: 6}}, y: {grid: {color: css('--line')}, ticks: {color: css('--ink-3')}}}}});
+}
+function frontUpd() {
+  const L = LIVE || {};
+  $('#front-upd').textContent = L.updated_at ? `帳本同步於 ${ago(L.updated_at)} · ${L.schedule || ''}` : '';
+}
+function renderFront() {
+  const L = LIVE || {}, T = L.testnet, P = L.paper;
+  frontUpd();
+  // ---- testnet ----
+  if (!T) {
+    $('#tn-panel').innerHTML = '<div class="panel-h"><h2>測試網執行器</h2></div><div class="empty">尚未建立子帳。</div>';
+    $('#tn-fills').innerHTML = '';
+  } else {
+    const last = T.last || {}, nav = last.nav, cap = T.capital, reg = T.regime || {};
+    const xb = ['BTC', 'ETH'].map(a => {
+      const e = last.exposure ? last.exposure[`${a}/USDT`] : null;
+      const tgt = reg[a] ? (reg[a].on ? 0.5 : 0) : null;
+      return `<div class="xbar"><span class="mono">${a}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, (e || 0) * 100))}%"></i>` +
+        (tgt != null ? `<b style="left:calc(${tgt * 100}% - 1px)" title="目標 ${tgt * 100}%"></b>` : '') +
+        `</div><span class="n">${e == null ? '—' : (e * 100).toFixed(1) + '%'} / 目標 ${tgt == null ? '—' : (tgt * 100).toFixed(0) + '%'}</span></div>`;
+    }).join('');
+    const R = T.reconcile_rows || {};
+    const recon = ['BTC', 'ETH', 'USDT'].map(k => {
+      if (!R[k]) return '';
+      const d = k === 'USDT' ? 2 : 5;
+      return `<div>${k} 子帳<b>${money(R[k].sleeve, d)}</b>帳戶 <span class="mono">${money(R[k].account, d)}</span> <span class="${R[k].ok ? 'okm' : 'bad'}">${R[k].ok ? '✓' : '✗'}</span></div>`;
+    }).join('');
+    const runs = T.runs || [], nFills = (T.fills || []).length;
+    const ret = nav != null && cap ? nav / cap - 1 : null;
+    $('#tn-panel').innerHTML = `<div class="panel-h"><h2>測試網執行器</h2><span>${statusChip(last.status)} <span class="chip warn">測試網 · 假資金</span></span></div>
+      <div class="navrow"><div class="big" style="font-size:36px">${money(nav, 0)}<small>USDT</small></div>
+        <span class="sub2">子帳資本 ${money(cap, 0)} · <b class="mono ${ret != null && ret >= 0 ? 'up' : 'down'}">${pct(ret, 2)}</b></span></div>
+      <div class="xbars">${xb}</div>
+      <div class="recon">${recon}</div>
+      <dl class="kv"><dt>最後決策 K 線</dt><dd class="mono">${esc(last.date || '—')}${last.finished ? `（${ago(last.finished)}完成）` : ''}</dd>
+        <dt>對帳</dt><dd>${last.ok == null ? '—' : (last.ok ? '<span class="up">✓ 帳戶 ≥ 子帳</span>' : '<span class="down">✗ 不符，看 live/state/run.log</span>')}</dd>
+        <dt>累計</dt><dd>${runs.length} 次執行 · ${nFills} 筆成交${last.error ? ` · <span class="down">${esc(last.error)}</span>` : ''}</dd>
+        <dt>下單方式</dt><dd>先掛 LIMIT_MAKER 60 秒，未成交轉市價；測試網手續費為 0</dd></dl>
+      ${runs.length >= 2 ? '<div class="minichart"><canvas id="tn-chart" role="img" aria-label="測試網子帳 NAV"></canvas></div>'
+        : `<div class="empty">NAV 曲線在累積 2 次執行後顯示（目前 ${runs.length} 次）。</div>`}`;
+    if (runs.length >= 2) tnChart = lineChart($('#tn-chart'), runs.map(r => r.date),
+      [{label: '子帳 NAV', data: runs.map(r => r.nav), borderColor: css('--s1'), borderWidth: 2, pointRadius: 0}], tnChart);
+    const F = (T.fills || []).slice().reverse();
+    $('#tn-fills').innerHTML = '<thead><tr><th>成交時間（UTC）</th><th>標的</th><th>方向</th><th>類型</th><th class="num">數量</th><th class="num">均價</th><th class="num">金額 USDT</th><th>clientOrderId</th></tr></thead><tbody>' +
+      (F.length ? F.map(f => `<tr><td class="mono">${esc(String(f.time).replace('T', ' ').replace('+00:00', ''))}</td><td>${esc(f.symbol)}</td>` +
+        `<td class="${f.side === 'buy' ? 'up' : 'down'}">${f.side === 'buy' ? '買' : '賣'}</td>` +
+        `<td>${f.type === 'limit' ? '<span class="chip good">掛單</span>' : '<span class="chip">市價</span>'}</td>` +
+        `<td class="num">${num(f.qty, 5)}</td><td class="num">${money(f.avg)}</td><td class="num">${money(f.cost)}</td><td class="mono muted">${esc(f.client_id || '')}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="muted">尚無成交</td></tr>') + '</tbody>';
+  }
+  // ---- paper + regime ----
+  const reg = (T && T.regime) || {};
+  const regs = Object.entries(reg).map(([a, r]) => {
+    const d = Math.max(-0.3, Math.min(0.3, r.dist)), w = Math.abs(d) / 0.3 * 50;
+    const bar = d >= 0 ? `left:50%;width:${w}%;background:var(--good)` : `right:50%;width:${w}%;background:var(--bad)`;
+    return `<div class="reg"><span class="mono">${a}</span><div><div class="dist"><span class="mid"></span><i style="${bar}"></i></div>
+      <div class="meta" style="margin-top:4px">close ${money(r.close)} · EMA50 ${money(r.ema)} · ${esc(r.bar)}</div></div>
+      <span class="chip ${r.on ? 'good' : 'bad'}">${r.on ? '趨勢內' : '趨勢外'} <b>${pct(r.dist, 1)}</b></span></div>`;
+  }).join('');
+  let body;
+  if (!P) body = '<div class="empty">紙上帳本尚未建立。</div>';
+  else if (!P.last) body = `<div class="navrow"><div class="big" style="font-size:30px">尚未起算</div></div>
+      <div class="empty">上線日 <b class="mono">${esc(P.start)}</b>：這根日線在 00:00 UTC 收盤後，下一次排程記第一天。資本 ${money(P.capital, 0)} USDT、BTC/ETH 各 50%、費 0.10% 滑 0.05%，帳本與回測引擎逐位一致。</div>`;
+  else {
+    const x = P.last;
+    const pend = x.pending && Object.keys(x.pending).length ? Object.entries(x.pending).map(([k, v]) => `${k.split('/')[0]} → ${(v * 100).toFixed(0)}%`).join('；') : '無';
+    body = `<div class="navrow"><div class="big" style="font-size:36px">${money(x.nav, 0)}<small>USDT</small></div>
+        <span class="sub2">持有 ${money(x.bh_nav, 0)} · 比值 <b class="mono ${x.ratio >= 1 ? 'up' : 'down'}">${num(x.ratio, 4)}</b></span></div>
+      <dl class="kv"><dt>天數</dt><dd>${P.days} 天 · ${P.n_fills} 筆成交（最後處理 ${esc(P.last_processed)}）</dd>
+        <dt>NAV 回撤</dt><dd class="mono">${pct(x.nav_dd)}</dd><dt>比值高水位回撤</dt><dd class="mono">${pct(x.ratio_dd)}</dd>
+        <dt>滾動 90/180/365</dt><dd class="mono">${[x.roll90, x.roll180, x.roll365].map(v => pct(v)).join(' / ')}</dd>
+        <dt>明天的單</dt><dd>${pend}</dd></dl>
+      ${P.series.length >= 2 ? '<div class="minichart"><canvas id="pp-chart" role="img" aria-label="紙上 NAV 與持有"></canvas></div>' : ''}`;
+  }
+  $('#pp-panel').innerHTML = `<div class="panel-h"><h2>紙上前向</h2><span class="chip acc">上線 <b>${esc(P ? P.start : '—')}</b></span></div>${body}
+    <div class="muted" style="font-size:11px;margin-top:16px;letter-spacing:.06em">趨勢狀態 · close 對 EMA50（刻度 ±30%）</div><div class="regs">${regs || '<span class="muted">—</span>'}</div>`;
+  if (P && P.last && P.series.length >= 2) ppChart = lineChart($('#pp-chart'), P.series.map(r => r.d), [
+    {label: '紙上 NAV', data: P.series.map(r => r.nav), borderColor: css('--s1'), borderWidth: 2, pointRadius: 0},
+    {label: '持有', data: P.series.map(r => r.bh), borderColor: css('--bh'), borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0}], ppChart);
+}
+renderFront();
+setInterval(frontUpd, 30000);
+(async () => {
+  try {
+    if (!window.claude || typeof window.claude.use !== 'function') return;
+    const db = await window.claude.use('db');
+    if (!db) return;
+    db.doc('live/current').onSnapshot((snap) => { if (snap.exists) { LIVE = Object.assign({}, snap.data()); renderFront(); } }, () => {});
+  } catch (_) {}
 })();
 
 // ---------- baseline & directions ----------

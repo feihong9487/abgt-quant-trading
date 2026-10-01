@@ -375,8 +375,11 @@ def cmd_run(args) -> int:
             f"{o['symbol']} {o['side']} {o['qty']:.6f}（目前 {o['current']:.1%} → 目標 {o['target']:.0%}，參考價 {o['price_ref']:,.2f}）"))
     if dry:
         return 0
+    prev = st["runs"].get(day) or {}
     st["runs"][day] = {"status": "running", "started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "decision": d,
-                       "targets": targets, "orders": [{k: v for k, v in o.items() if not callable(v)} for o in orders]}
+                       "targets": targets, "orders": [{k: v for k, v in o.items() if not callable(v)} for o in orders],
+                       "prev_fills": [f for f in prev.get("fills", []) + prev.get("prev_fills", []) if f],   # --force 重跑不丟前一次的成交
+                       "attempt": int(prev.get("attempt", 0)) + 1}
     save_state(st)
     fills = []
     try:
@@ -399,7 +402,7 @@ def cmd_run(args) -> int:
         return 2
     rec = reconcile(ex, st, mid_prices(ex))
     st["runs"][day].update({"status": "done", "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                            "fills": [f for f in fills if f], "reconcile": rec})
+                            "fills": st["runs"][day].pop("prev_fills") + [f for f in fills if f], "reconcile": rec})
     save_state(st)
     log(f"完成：成交 {len([f for f in fills if f])} 筆 | 子帳 NAV {rec['nav']:,.2f} | 曝險 " + ", ".join(f"{s.split('/')[0]} {v:.1%}" for s, v in rec["exposure"].items())
         + f" | 對帳 {'OK' if rec['ok'] else '不符'}")

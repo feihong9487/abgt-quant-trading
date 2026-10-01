@@ -1,6 +1,6 @@
 {
   "round": 4,
-  "status": "round_4_done_paper_forward_next",
+  "status": "paper_forward_and_testnet_live",
   "rounds_without_champion": 1,
   "baseline_id": "ema50_plain",
   "run_id": null,
@@ -20,6 +20,6 @@
   "agents_total": null,
   "running": [],
   "started": "2026-09-23T20:46+08:00",
-  "message": "第 4 輪完成：無新冠軍，分級曝險與 hold 型運行閘門關閉。c 組合十格全過。現貨紙上前向已建帳（上線 2026-10-01），等排程。",
-  "updated_at": "2026-09-23T21:06:40+08:00"
+  "message": "",
+  "updated_at": "2026-10-01T09:58:16+08:00"
 }

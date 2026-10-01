@@ -186,6 +186,44 @@ def workflow_progress(run_id: str | None) -> dict:
     return {"run_id": run_id, "journal": True, "done": len(done_set), "started": len(started_order), "phases": phases, "running": running[-10:], "started_at": started_at}
 
 
+def live_snapshot() -> dict:
+    """紙上前向帳本 + 測試網執行器子帳 → 頁面「前線」區塊（也寫進 artifact 資料庫 live/current）。"""
+    out = {"updated_at": datetime.now().astimezone().isoformat(timespec="seconds"), "schedule": "每天 08:05 台北（00:05 UTC）· 排程 ABGT-paper"}
+    ex_path = os.path.join(ROOT, "live", "state", "executor.json")
+    if os.path.exists(ex_path):
+        st = jload(ex_path)
+        runs = st.get("runs", {})
+        hist = []
+        for day in sorted(runs):
+            r = runs[day]
+            rec = r.get("reconcile") or {}
+            hist.append({"date": day, "status": r.get("status"), "nav": rec.get("nav"), "ok": rec.get("ok"),
+                         "n_fills": len([f for f in r.get("fills", []) if f]), "exposure": rec.get("exposure"),
+                         "error": r.get("error"), "finished": r.get("finished")})
+        last = runs[sorted(runs)[-1]] if runs else {}
+        dec = last.get("decision") or {}
+        out["testnet"] = {
+            "venue": st.get("venue"), "capital": st.get("capital"), "created": st.get("created"),
+            "sleeve": st.get("sleeve"), "runs": hist[-60:],
+            "last": hist[-1] if hist else None,
+            "regime": {k.split("/")[0]: {"on": v["on"], "close": v["close"], "ema": v["ema"], "dist": v["dist_pct"], "bar": v["bar"]} for k, v in dec.items()},
+            "reconcile_rows": (last.get("reconcile") or {}).get("rows"),
+            "fills": [{"time": f["time"], "symbol": f["symbol"].split("/")[0], "side": f["side"], "type": f.get("type"), "qty": f["qty"],
+                       "avg": f["avg"], "cost": f["cost"], "client_id": f.get("client_id")} for f in st.get("fills", [])][-20:],
+        }
+    pp = os.path.join(ROOT, "live", "state", "paper.json")
+    if os.path.exists(pp):
+        st = jload(pp)
+        h = st.get("history", [])
+        out["paper"] = {
+            "start": st["config"]["start"], "capital": st["config"]["capital"], "last_processed": st.get("last_processed"),
+            "days": len(h), "n_fills": len(st.get("fills", [])),
+            "last": ({k: h[-1][k] for k in ("date", "nav", "bh_nav", "ratio", "ratio_dd", "nav_dd", "roll90", "roll180", "roll365")} | {"pending": h[-1].get("pending")}) if h else None,
+            "series": [{"d": x["date"], "nav": round(x["nav"], 2), "bh": round(x["bh_nav"], 2)} for x in h],
+        }
+    return out
+
+
 def status_snapshot(state: dict, rounds: list[dict], progress: dict, message: str = "") -> dict:
     """寫進 artifact 資料庫 status/current 的即時狀態（也內嵌在頁面當快照）。"""
     directions = state.get(f"directions_round_{state['round']}", [])
@@ -215,6 +253,9 @@ def main() -> int:
     status = status_snapshot(state, rounds, progress, message)
     with open(os.path.join(ROOT, "dashboard", "status.json"), "w", encoding="utf-8") as f:
         json.dump(status, f, ensure_ascii=False, indent=2)
+    live = live_snapshot()
+    with open(os.path.join(ROOT, "dashboard", "live.json"), "w", encoding="utf-8") as f:
+        json.dump(live, f, ensure_ascii=False, indent=1)
     curves, windows = equity_curves()
     data = {
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -223,6 +264,7 @@ def main() -> int:
         "directions": [{"key": d["key"], "n": d.get("n", 2), "prompt": d["prompt"][:160]} for d in state.get(f"directions_round_{state['round']}", [])],
         "rounds": rounds,
         "status": status,
+        "live": live,
         "progress": progress,
         "curves": curves, "windows": windows,
         "variants": variants_table(state["ledger"]),

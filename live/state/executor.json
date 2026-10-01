@@ -41,7 +41,36 @@
       },
       "orders": [],
       "finished": "2026-10-01T01:53:57+00:00",
-      "fills": [],
+      "fills": [
+        {
+          "time": "2026-10-01T01:53:14+00:00",
+          "symbol": "BTC/USDT",
+          "side": "buy",
+          "type": "limit",
+          "qty": 0.05926,
+          "avg": 83525.98,
+          "cost": 4949.7495748,
+          "fee_base": 0.0,
+          "fee_quote": 0.0,
+          "fee_other": 0.0,
+          "id": "8246998",
+          "client_id": "abgt-20260930-BTC-bm"
+        },
+        {
+          "time": "2026-10-01T01:53:44+00:00",
+          "symbol": "ETH/USDT",
+          "side": "buy",
+          "type": "market",
+          "qty": 1.8407,
+          "avg": 2689.31,
+          "cost": 4950.212917,
+          "fee_base": 0.0,
+          "fee_quote": 0.0,
+          "fee_other": 0.0,
+          "id": "7354603",
+          "client_id": "abgt-20260930-ETH-b"
+        }
+      ],
       "reconcile": {
         "ok": true,
         "rows": {
@@ -66,7 +95,9 @@
           "BTC/USDT": 0.49992133309876663,
           "ETH/USDT": 0.5000748785997343
         }
-      }
+      },
+      "attempt": 2,
+      "note": "第 1 次執行成交 2 筆；第 2 次 --force 判定不用下單（紀錄於 2026-10-01 由 fills 帳補回）"
     }
   },
   "fills": [
