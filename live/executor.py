@@ -56,8 +56,8 @@ def log(msg: str) -> None:
 def read_env() -> dict:
     out = {}
     if os.path.exists(ENV):
-        for line in open(ENV, encoding="utf-8"):
-            line = line.strip()
+        for line in open(ENV, encoding="utf-8-sig"):
+            line = line.strip().replace("＝", "=")         # 中文輸入法的全形等號
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 out[k.strip()] = v.strip().strip('"').strip("'")

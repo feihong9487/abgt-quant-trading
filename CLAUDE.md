@@ -246,7 +246,7 @@ ema50_plain、BTC/USDT 與 ETH/USDT 現貨各 50%、費 0.10%/邊、滑 0.05%、
 
 ### 測試網執行器（`live/executor.py`，2026-09-24）
 
-只連 `testnet.binance.vision`（URL 硬檢查、無正式網下單路徑）；決策用正式網公開日線、成交在測試網；子帳記帳、冪等 clientOrderId、只在交易所明確回「找不到」時才重下、先賣後買、`--maker-first N`、`live/KILL` 停單 / `--flatten`、對帳。沒有金鑰自動 dry-run。等 `ABGT/.env` 放 `BINANCE_TESTNET_KEY/SECRET`。
+只連 `testnet.binance.vision`（URL 硬檢查、無正式網下單路徑）；決策用正式網公開日線、成交在測試網；子帳記帳、冪等 clientOrderId、只在交易所明確回「找不到」時才重下、先賣後買、`--maker-first N`、`live/KILL` 停單 / `--flatten`、對帳。沒有金鑰自動 dry-run。2026-10-01 上線（`.env` 解析容忍全形「＝」）；帳本 `live/state/executor.json`。
 
 ### 結論（2026-09-23）
 
@@ -277,7 +277,8 @@ ema50_plain、BTC/USDT 與 ETH/USDT 現貨各 50%、費 0.10%/邊、滑 0.05%、
 - [x] 四個資本槓桿分析 + 槓桿系統（強平、回撤降槓桿、組合 vol_target）+ 事前登記槓桿網格 → 現在 1×
 - [x] 持有基準改視窗起點重設；組合引擎現貨不透支
 - [x] Binance 現貨測試網執行器 `live/executor.py`（dry-run 已驗證）
-- [ ] 測試網金鑰 → executor init / run / 加入 run_daily.bat；4 × 25% 記錄型分帳
+- [x] 測試網執行器上線（2026-10-01）：子帳 9,900 USDT、首筆 BTC LIMIT_MAKER 成交 / ETH 30 秒未成交轉市價、對帳 OK、重跑冪等；加入 `run_daily.bat`（ABGT-paper 排程每天 08:05 台北）。測試網手續費為 0，真實成本要在正式網量
+- [ ] 4 × 25% 記錄型分帳
 
 ## 7. 與 Claude 協作
 
