@@ -1,0 +1,102 @@
+{
+  "created": "2026-10-01T01:52:51+00:00",
+  "venue": "binance spot testnet (testnet.binance.vision)",
+  "strategy": "ema50_plain",
+  "weights": {
+    "BTC/USDT": 0.5,
+    "ETH/USDT": 0.5
+  },
+  "capital": 9900.0,
+  "rebalance_threshold": 0.15,
+  "sleeve": {
+    "usdt": 0.03750820000004751,
+    "qty": {
+      "BTC/USDT": 0.05926,
+      "ETH/USDT": 1.8407
+    }
+  },
+  "runs": {
+    "2026-09-30": {
+      "status": "done",
+      "started": "2026-10-01T01:53:57+00:00",
+      "decision": {
+        "BTC/USDT": {
+          "bar": "2026-09-30",
+          "close": 83623.6,
+          "ema": 77807.27570954847,
+          "on": true,
+          "dist_pct": 0.07475296156317879
+        },
+        "ETH/USDT": {
+          "bar": "2026-09-30",
+          "close": 2686.01,
+          "ema": 2446.9247164648264,
+          "on": true,
+          "dist_pct": 0.0977084754289419
+        }
+      },
+      "targets": {
+        "BTC/USDT": 0.5,
+        "ETH/USDT": 0.5
+      },
+      "orders": [],
+      "finished": "2026-10-01T01:53:57+00:00",
+      "fills": [],
+      "reconcile": {
+        "ok": true,
+        "rows": {
+          "BTC": {
+            "account": 1.05926,
+            "sleeve": 0.05926,
+            "ok": true
+          },
+          "ETH": {
+            "account": 2.8407,
+            "sleeve": 1.8407,
+            "ok": true
+          },
+          "USDT": {
+            "account": 100.0375082,
+            "sleeve": 0.03750820000004751,
+            "ok": true
+          }
+        },
+        "nav": 9901.059884000002,
+        "exposure": {
+          "BTC/USDT": 0.49992133309876663,
+          "ETH/USDT": 0.5000748785997343
+        }
+      }
+    }
+  },
+  "fills": [
+    {
+      "time": "2026-10-01T01:53:14+00:00",
+      "symbol": "BTC/USDT",
+      "side": "buy",
+      "type": "limit",
+      "qty": 0.05926,
+      "avg": 83525.98,
+      "cost": 4949.7495748,
+      "fee_base": 0.0,
+      "fee_quote": 0.0,
+      "fee_other": 0.0,
+      "id": "8246998",
+      "client_id": "abgt-20260930-BTC-bm"
+    },
+    {
+      "time": "2026-10-01T01:53:44+00:00",
+      "symbol": "ETH/USDT",
+      "side": "buy",
+      "type": "market",
+      "qty": 1.8407,
+      "avg": 2689.31,
+      "cost": 4950.212917,
+      "fee_base": 0.0,
+      "fee_quote": 0.0,
+      "fee_other": 0.0,
+      "id": "7354603",
+      "client_id": "abgt-20260930-ETH-b"
+    }
+  ]
+}
