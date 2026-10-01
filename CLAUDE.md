@@ -259,6 +259,10 @@ claude.ai 頁面宣告 `mcp: Google Drive [search_files, download_file_content]`
 `run_daily.bat` 每步失敗都寫進 `live/state/failed_steps.txt`、不中斷後續步驟；commit 後 `git push`（`GCM_INTERACTIVE=never`）；最後 `live/notify.py daily` 發 Discord（`.env` 的 `DISCORD_WEBHOOK_URL`）：只在有事時發（步驟失敗、測試網錯誤 / 金鑰失效 / 對帳不符 / 重置、當天成交、EMA50 翻轉、紙上帳本沒推進），每週一發摘要。
 執行器：下單前比對帳戶餘額與子帳，帳戶較少 → 判定測試網重置，封存舊子帳（`resets`）並以 min(原資本, 帳戶 USDT × 0.99) 重建；`AuthenticationError` → 狀態 `auth_error`、回傳 5、通知重產金鑰。每筆成交記 `leg`（maker/market）、`ref_mid`、`slip_bps`（正 = 成本）、`wait_s`、`filled_frac`。測試 `tests/test_live.py`。
 
+### 收盤時點穩健性（2026-10-01，`experiments/rounds/close_timing.md`）
+
+1h 合成 24 個收盤時點的日線：組合十格全過 **23/24**；策略 − 持有 Sharpe 中位數 OOS +0.19、OOS2 +0.29；00:00 在 OOS 排 21/24、OOS2 23/24 → 判定**穩健**、回測值偏保守。時點排名在視窗間不延續（Spearman ≈ 0）、各時點日報酬相關 0.98 → 時點差異是雜訊：不改收盤時點、不做時間分散。中位數 1.15 不是前向期望（抽樣誤差 ±0.5、變體選擇偏差）。獨立驗證 pass。
+
 ### 結論（2026-09-23）
 
 1. **APEX 輸給持有不是 bug，是設計**：每筆風險 1%、3.7 年 11 回合，全贏也只有 +27%。ATR 風險式倉位在 5 倍牛市裡結構上追不上持有；它的價值在回撤（−5.4% vs −53%），不在報酬。
@@ -282,7 +286,8 @@ claude.ai 頁面宣告 `mcp: Google Drive [search_files, download_file_content]`
 - [x] 通道版正式化 `abgt/strategies/atr_channel.py`；ema50_plain Pine 版 `pine/ema50_plain.pine`
 - [x] 現貨資料來源檢查；`live/paper.py` 紙上前向（上線 2026-10-01）；Windows 排程任務 `ABGT-paper` 每天 08:05 台北執行 `live/run_daily.bat`（已建立並測試，結果碼 0）
 - [x] ETH 決定：留在 50/50 組合跑前向，6 個月檢查點見 `live/README.md`
-- [ ] 前向累積 ≥ 6 個月後：guard_cohort_calibration（純量測）決定 X 是否存在；session_close_robustness（1h 合成不同收盤時點）
+- [ ] 前向累積 ≥ 6 個月後：guard_cohort_calibration（純量測）決定 X 是否存在
+- [x] session_close_robustness（1h 合成 24 個收盤時點）：穩健（2026-10-01）
 - [x] 第 5 輪：使用者決定不開（2026-09-23）
 - [x] 資金費率歷史資料接進 data.py；結論：永續執行成本讓基準 ETH 全掛、BTC IS 掉閘門，上線走現貨
 - [x] 四個資本槓桿分析 + 槓桿系統（強平、回撤降槓桿、組合 vol_target）+ 事前登記槓桿網格 → 現在 1×
