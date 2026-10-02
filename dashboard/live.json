@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-01T13:31:24+08:00",
+ "updated_at": "2026-10-02T08:05:11+08:00",
  "schedule": "每天 08:05 台北（00:05 UTC）· 排程 ABGT-paper",
  "testnet": {
   "venue": "binance spot testnet (testnet.binance.vision)",
@@ -25,35 +25,48 @@
     },
     "error": null,
     "finished": "2026-10-01T05:30:55+00:00"
+   },
+   {
+    "date": "2026-10-01",
+    "status": "done",
+    "nav": 9999.870180599999,
+    "ok": true,
+    "n_fills": 0,
+    "exposure": {
+     "BTC/USDT": 0.5023666677839391,
+     "ETH/USDT": 0.4976295813473673
+    },
+    "error": null,
+    "finished": "2026-10-02T00:05:10+00:00"
    }
   ],
   "last": {
-   "date": "2026-09-30",
+   "date": "2026-10-01",
    "status": "done",
-   "nav": 9991.481068000001,
+   "nav": 9999.870180599999,
    "ok": true,
-   "n_fills": 2,
+   "n_fills": 0,
    "exposure": {
-    "BTC/USDT": 0.49989286896580043,
-    "ETH/USDT": 0.500103377016177
+    "BTC/USDT": 0.5023666677839391,
+    "ETH/USDT": 0.4976295813473673
    },
    "error": null,
-   "finished": "2026-10-01T05:30:55+00:00"
+   "finished": "2026-10-02T00:05:10+00:00"
   },
   "regime": {
    "BTC": {
     "on": true,
-    "close": 83623.6,
-    "ema": 77807.27570954847,
-    "dist": 0.07475296156317879,
-    "bar": "2026-09-30"
+    "close": 84880.05,
+    "ema": 78084.63956834994,
+    "dist": 0.08702621244350905,
+    "bar": "2026-10-01"
    },
    "ETH": {
     "on": true,
-    "close": 2686.01,
-    "ema": 2446.9247164648264,
-    "dist": 0.0977084754289419,
-    "bar": "2026-09-30"
+    "close": 2706.42,
+    "ema": 2457.101007038908,
+    "dist": 0.10146876023690643,
+    "bar": "2026-10-01"
    }
   },
   "reconcile_rows": {
@@ -111,11 +124,31 @@
  "paper": {
   "start": "2026-10-01",
   "capital": 10000.0,
-  "last_processed": null,
-  "days": 0,
+  "last_processed": "2026-10-01",
+  "days": 1,
   "n_fills": 0,
-  "last": null,
-  "series": []
+  "last": {
+   "date": "2026-10-01",
+   "nav": 10000.0,
+   "bh_nav": 9990.0,
+   "ratio": 1.001001001001001,
+   "ratio_dd": 0.0,
+   "nav_dd": 0.0,
+   "roll90": null,
+   "roll180": null,
+   "roll365": null,
+   "pending": {
+    "BTC/USDT": 0.5,
+    "ETH/USDT": 0.5
+   }
+  },
+  "series": [
+   {
+    "d": "2026-10-01",
+    "nav": 10000.0,
+    "bh": 9990.0
+   }
+  ]
  },
  "papers": [
   {
@@ -125,12 +158,12 @@
     "ETH"
    ],
    "start": "2026-10-01",
-   "days": 0,
+   "days": 1,
    "n_fills": 0,
-   "nav": null,
-   "bh_nav": null,
-   "ratio": null,
-   "nav_dd": null,
+   "nav": 10000.0,
+   "bh_nav": 9990.0,
+   "ratio": 1.001001001001001,
+   "nav_dd": 0.0,
    "capital": 10000.0
   },
   {
@@ -142,12 +175,12 @@
     "BNB"
    ],
    "start": "2026-10-01",
-   "days": 0,
+   "days": 1,
    "n_fills": 0,
-   "nav": null,
-   "bh_nav": null,
-   "ratio": null,
-   "nav_dd": null,
+   "nav": 10000.0,
+   "bh_nav": 9990.0,
+   "ratio": 1.001001001001001,
+   "nav_dd": 0.0,
    "capital": 10000.0
   }
  ]
