@@ -24,13 +24,15 @@
     "BTC/USDT": 0.05890665710022555,
     "ETH/USDT": 0.0
   },
-  "pending": {},
+  "pending": {
+    "BTC/USDT": 0.0
+  },
   "bh_qty": {
     "BTC/USDT": 0.058847750443125325,
     "ETH/USDT": 1.8456115458797968
   },
   "started": true,
-  "last_processed": "2026-10-24",
+  "last_processed": "2026-10-25",
   "history": [
     {
       "date": "2026-10-01",
@@ -862,6 +864,40 @@
       },
       "pending": {},
       "fills": []
+    },
+    {
+      "date": "2026-10-25",
+      "nav": 9152.189943921236,
+      "bh_nav": 9016.92285771477,
+      "ratio": 1.0150014687206437,
+      "ratio_dd": 0.0,
+      "nav_dd": -0.09563235231373723,
+      "roll90": null,
+      "roll180": null,
+      "roll365": null,
+      "cash": 4430.580449110618,
+      "positions": {
+        "BTC/USDT": 0.05890665710022555,
+        "ETH/USDT": 0.0
+      },
+      "regime": {
+        "BTC/USDT": {
+          "on": false,
+          "close": 80154.09,
+          "ema": 80826.65138299849,
+          "dist_pct": -0.008321034850392928
+        },
+        "ETH/USDT": {
+          "on": false,
+          "close": 2329.87,
+          "ema": 2464.484235812891,
+          "dist_pct": -0.05462166641471311
+        }
+      },
+      "pending": {
+        "BTC/USDT": 0.0
+      },
+      "fills": []
     }
   ],
   "fills": [
@@ -916,6 +952,6 @@
       "reason": "趨勢結束"
     }
   ],
-  "ratio_hwm": 1.0089844087614595,
+  "ratio_hwm": 1.0150014687206437,
   "nav_hwm": 10119.988223081873
 }

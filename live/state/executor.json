@@ -9,9 +9,9 @@
   "capital": 9900.0,
   "rebalance_threshold": 0.15,
   "sleeve": {
-    "usdt": 4632.0412479999995,
+    "usdt": 9391.356405999999,
     "qty": {
-      "BTC/USDT": 0.05946,
+      "BTC/USDT": 0.0,
       "ETH/USDT": 0.0
     }
   },
@@ -1493,6 +1493,91 @@
           "ETH/USDT": 0.0
         }
       }
+    },
+    "2026-10-25": {
+      "status": "done",
+      "started": "2026-10-26T00:05:11+00:00",
+      "decision": {
+        "BTC/USDT": {
+          "bar": "2026-10-25",
+          "close": 80154.09,
+          "ema": 80826.65275975455,
+          "on": false,
+          "dist_pct": -0.008321051742098629
+        },
+        "ETH/USDT": {
+          "bar": "2026-10-25",
+          "close": 2329.87,
+          "ema": 2464.4843109599415,
+          "on": false,
+          "dist_pct": -0.05462169524118732
+        }
+      },
+      "targets": {
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0
+      },
+      "orders": [
+        {
+          "symbol": "BTC/USDT",
+          "side": "sell",
+          "qty": 0.05946,
+          "target": 0.0,
+          "current": 0.5067550556676307,
+          "nav": 9390.955348299998,
+          "price_ref": 80035.555
+        }
+      ],
+      "attempt": 1,
+      "reset": false,
+      "finished": "2026-10-26T00:05:31+00:00",
+      "fills": [
+        {
+          "time": "2026-10-26T00:05:31+00:00",
+          "symbol": "BTC/USDT",
+          "side": "sell",
+          "type": "limit",
+          "qty": 0.05946,
+          "avg": 80042.3,
+          "cost": 4759.315158,
+          "fee_base": 0.0,
+          "fee_quote": 0.0,
+          "fee_other": 0.0,
+          "id": "7015845",
+          "client_id": "abgt-20261025-BTC-sm",
+          "leg": "maker",
+          "ref_mid": 80035.555,
+          "wait_s": 20.3,
+          "target_qty": 0.05946,
+          "filled_frac": 1.0,
+          "slip_bps": -0.8427504500985172
+        }
+      ],
+      "reconcile": {
+        "ok": true,
+        "rows": {
+          "BTC": {
+            "account": 1.0,
+            "sleeve": 0.0,
+            "ok": true
+          },
+          "ETH": {
+            "account": 1.0,
+            "sleeve": 0.0,
+            "ok": true
+          },
+          "USDT": {
+            "account": 9491.356406,
+            "sleeve": 9391.356405999999,
+            "ok": true
+          }
+        },
+        "nav": 9391.356405999999,
+        "exposure": {
+          "BTC/USDT": 0.0,
+          "ETH/USDT": 0.0
+        }
+      }
     }
   },
   "fills": [
@@ -1623,6 +1708,26 @@
       "target_qty": 1.897,
       "after_maker": true,
       "slip_bps": 23.90545974480185
+    },
+    {
+      "time": "2026-10-26T00:05:31+00:00",
+      "symbol": "BTC/USDT",
+      "side": "sell",
+      "type": "limit",
+      "qty": 0.05946,
+      "avg": 80042.3,
+      "cost": 4759.315158,
+      "fee_base": 0.0,
+      "fee_quote": 0.0,
+      "fee_other": 0.0,
+      "id": "7015845",
+      "client_id": "abgt-20261025-BTC-sm",
+      "leg": "maker",
+      "ref_mid": 80035.555,
+      "wait_s": 20.3,
+      "target_qty": 0.05946,
+      "filled_frac": 1.0,
+      "slip_bps": -0.8427504500985172
     }
   ],
   "resets": [
