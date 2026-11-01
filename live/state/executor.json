@@ -1910,6 +1910,60 @@
           "ETH/USDT": 0.0
         }
       }
+    },
+    "2026-10-31": {
+      "status": "done",
+      "started": "2026-11-01T00:05:12+00:00",
+      "decision": {
+        "BTC/USDT": {
+          "bar": "2026-10-31",
+          "close": 77582.02,
+          "ema": 80465.55587058984,
+          "on": false,
+          "dist_pct": -0.03583565463994731
+        },
+        "ETH/USDT": {
+          "bar": "2026-10-31",
+          "close": 2255.66,
+          "ema": 2428.4431717345738,
+          "on": false,
+          "dist_pct": -0.07114976942662377
+        }
+      },
+      "targets": {
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0
+      },
+      "orders": [],
+      "attempt": 1,
+      "reset": false,
+      "finished": "2026-11-01T00:05:12+00:00",
+      "fills": [],
+      "reconcile": {
+        "ok": true,
+        "rows": {
+          "BTC": {
+            "account": 1.0,
+            "sleeve": 0.0,
+            "ok": true
+          },
+          "ETH": {
+            "account": 1.0,
+            "sleeve": 0.0,
+            "ok": true
+          },
+          "USDT": {
+            "account": 9327.0465174,
+            "sleeve": 9227.046517399998,
+            "ok": true
+          }
+        },
+        "nav": 9227.046517399998,
+        "exposure": {
+          "BTC/USDT": 0.0,
+          "ETH/USDT": 0.0
+        }
+      }
     }
   },
   "fills": [

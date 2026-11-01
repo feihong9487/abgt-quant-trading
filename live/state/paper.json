@@ -30,7 +30,7 @@
     "ETH/USDT": 1.8456115458797968
   },
   "started": true,
-  "last_processed": "2026-10-30",
+  "last_processed": "2026-10-31",
   "history": [
     {
       "date": "2026-10-01",
@@ -1093,6 +1093,38 @@
           "reason": "趨勢結束"
         }
       ]
+    },
+    {
+      "date": "2026-10-31",
+      "nav": 8966.737696970351,
+      "bh_nav": 8728.59949141278,
+      "ratio": 1.0272825217598598,
+      "ratio_dd": -0.0035775351655235044,
+      "nav_dd": -0.11395769448438342,
+      "roll90": null,
+      "roll180": null,
+      "roll365": null,
+      "cash": 8966.737696970351,
+      "positions": {
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0
+      },
+      "regime": {
+        "BTC/USDT": {
+          "on": false,
+          "close": 77582.02,
+          "ema": 80465.55355938936,
+          "dist_pct": -0.03583562694639386
+        },
+        "ETH/USDT": {
+          "on": false,
+          "close": 2255.66,
+          "ema": 2428.443058851853,
+          "dist_pct": -0.07114972625034233
+        }
+      },
+      "pending": {},
+      "fills": []
     }
   ],
   "fills": [
