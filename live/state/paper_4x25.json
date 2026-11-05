@@ -32,7 +32,10 @@
     "SOL/USDT": 0.0,
     "BNB/USDT": 0.0
   },
-  "pending": {},
+  "pending": {
+    "BTC/USDT": 0.25,
+    "ETH/USDT": 0.25
+  },
   "bh_qty": {
     "BTC/USDT": 0.029423875221562663,
     "ETH/USDT": 0.9228057729398984,
@@ -40,7 +43,7 @@
     "BNB/USDT": 3.2361516034985423
   },
   "started": true,
-  "last_processed": "2026-11-03",
+  "last_processed": "2026-11-04",
   "history": [
     {
       "date": "2026-10-01",
@@ -1850,6 +1853,55 @@
         }
       },
       "pending": {},
+      "fills": []
+    },
+    {
+      "date": "2026-11-04",
+      "nav": 8785.45793484381,
+      "bh_nav": 8952.78395949701,
+      "ratio": 0.9813101683889397,
+      "ratio_dd": -0.04582845550028303,
+      "nav_dd": -0.13835858602696693,
+      "roll90": null,
+      "roll180": null,
+      "roll365": null,
+      "cash": 8785.45793484381,
+      "positions": {
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0,
+        "SOL/USDT": 0.0,
+        "BNB/USDT": 0.0
+      },
+      "regime": {
+        "BTC/USDT": {
+          "on": true,
+          "close": 80504.01,
+          "ema": 80148.03167208504,
+          "dist_pct": 0.004441510546028038
+        },
+        "ETH/USDT": {
+          "on": true,
+          "close": 2424.61,
+          "ema": 2410.836026860432,
+          "dist_pct": 0.005713359592317779
+        },
+        "SOL/USDT": {
+          "on": false,
+          "close": 95.61,
+          "ema": 102.95570444290612,
+          "dist_pct": -0.07134820243961981
+        },
+        "BNB/USDT": {
+          "on": false,
+          "close": 719.99,
+          "ema": 728.3854502066648,
+          "dist_pct": -0.011526109155918451
+        }
+      },
+      "pending": {
+        "BTC/USDT": 0.25,
+        "ETH/USDT": 0.25
+      },
       "fills": []
     }
   ],

@@ -9,10 +9,10 @@
   "capital": 9900.0,
   "rebalance_threshold": 0.15,
   "sleeve": {
-    "usdt": 9227.046517399998,
+    "usdt": 2.619317399998181,
     "qty": {
-      "BTC/USDT": 0.0,
-      "ETH/USDT": 0.0
+      "BTC/USDT": 0.05723,
+      "ETH/USDT": 1.9038
     }
   },
   "runs": {
@@ -2126,6 +2126,120 @@
           "ETH/USDT": 0.0
         }
       }
+    },
+    "2026-11-04": {
+      "status": "done",
+      "started": "2026-11-05T00:05:10+00:00",
+      "decision": {
+        "BTC/USDT": {
+          "bar": "2026-11-04",
+          "close": 80504.01,
+          "ema": 80148.03448284874,
+          "on": true,
+          "dist_pct": 0.004441475320613453
+        },
+        "ETH/USDT": {
+          "bar": "2026-11-04",
+          "close": 2424.61,
+          "ema": 2410.836153449974,
+          "on": true,
+          "dist_pct": 0.005713306783754479
+        }
+      },
+      "targets": {
+        "BTC/USDT": 0.5,
+        "ETH/USDT": 0.5
+      },
+      "orders": [
+        {
+          "symbol": "BTC/USDT",
+          "side": "buy",
+          "qty": 0.05723,
+          "target": 0.5,
+          "current": 0.0,
+          "nav": 9227.046517399998,
+          "price_ref": 80602.005
+        },
+        {
+          "symbol": "ETH/USDT",
+          "side": "buy",
+          "qty": 1.9038,
+          "target": 0.5,
+          "current": 0.0,
+          "nav": 9227.046517399998,
+          "price_ref": 2423.315
+        }
+      ],
+      "attempt": 1,
+      "reset": false,
+      "finished": "2026-11-05T00:06:27+00:00",
+      "fills": [
+        {
+          "time": "2026-11-05T00:05:41+00:00",
+          "symbol": "BTC/USDT",
+          "side": "buy",
+          "type": "limit",
+          "qty": 0.05723,
+          "avg": 80602.0,
+          "cost": 4612.85246,
+          "fee_base": 0.0,
+          "fee_quote": 0.0,
+          "fee_other": 0.0,
+          "id": "10630670",
+          "client_id": "abgt-20261104-BTC-bm",
+          "leg": "maker",
+          "ref_mid": 80602.005,
+          "wait_s": 30.5,
+          "target_qty": 0.05723,
+          "filled_frac": 1.0,
+          "slip_bps": -0.000620331963574472
+        },
+        {
+          "time": "2026-11-05T00:06:26+00:00",
+          "symbol": "ETH/USDT",
+          "side": "buy",
+          "type": "limit",
+          "qty": 1.9038,
+          "avg": 2422.3,
+          "cost": 4611.57474,
+          "fee_base": 0.0,
+          "fee_quote": 0.0,
+          "fee_other": 0.0,
+          "id": "7867582",
+          "client_id": "abgt-20261104-ETH-bm",
+          "leg": "maker",
+          "ref_mid": 2423.315,
+          "wait_s": 45.6,
+          "target_qty": 1.9038,
+          "filled_frac": 1.0,
+          "slip_bps": -4.18847735436767
+        }
+      ],
+      "reconcile": {
+        "ok": true,
+        "rows": {
+          "BTC": {
+            "account": 1.05723,
+            "sleeve": 0.05723,
+            "ok": true
+          },
+          "ETH": {
+            "account": 2.9038,
+            "sleeve": 1.9038,
+            "ok": true
+          },
+          "USDT": {
+            "account": 102.6193174,
+            "sleeve": 2.619317399998181,
+            "ok": true
+          }
+        },
+        "nav": 9224.196446549999,
+        "exposure": {
+          "BTC/USDT": 0.49985844218165065,
+          "ETH/USDT": 0.4998575962380452
+        }
+      }
     }
   },
   "fills": [
@@ -2316,6 +2430,46 @@
       "target_qty": 0.05809,
       "filled_frac": 1.0,
       "slip_bps": -0.0006409845099142331
+    },
+    {
+      "time": "2026-11-05T00:05:41+00:00",
+      "symbol": "BTC/USDT",
+      "side": "buy",
+      "type": "limit",
+      "qty": 0.05723,
+      "avg": 80602.0,
+      "cost": 4612.85246,
+      "fee_base": 0.0,
+      "fee_quote": 0.0,
+      "fee_other": 0.0,
+      "id": "10630670",
+      "client_id": "abgt-20261104-BTC-bm",
+      "leg": "maker",
+      "ref_mid": 80602.005,
+      "wait_s": 30.5,
+      "target_qty": 0.05723,
+      "filled_frac": 1.0,
+      "slip_bps": -0.000620331963574472
+    },
+    {
+      "time": "2026-11-05T00:06:26+00:00",
+      "symbol": "ETH/USDT",
+      "side": "buy",
+      "type": "limit",
+      "qty": 1.9038,
+      "avg": 2422.3,
+      "cost": 4611.57474,
+      "fee_base": 0.0,
+      "fee_quote": 0.0,
+      "fee_other": 0.0,
+      "id": "7867582",
+      "client_id": "abgt-20261104-ETH-bm",
+      "leg": "maker",
+      "ref_mid": 2423.315,
+      "wait_s": 45.6,
+      "target_qty": 1.9038,
+      "filled_frac": 1.0,
+      "slip_bps": -4.18847735436767
     }
   ],
   "resets": [
