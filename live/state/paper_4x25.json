@@ -40,7 +40,7 @@
     "BNB/USDT": 3.2361516034985423
   },
   "started": true,
-  "last_processed": "2026-11-19",
+  "last_processed": "2026-11-20",
   "history": [
     {
       "date": "2026-10-01",
@@ -2635,6 +2635,52 @@
       },
       "pending": {},
       "fills": []
+    },
+    {
+      "date": "2026-11-20",
+      "nav": 8483.273691913044,
+      "bh_nav": 6435.4337256475055,
+      "ratio": 1.3182132010938383,
+      "ratio_dd": 0.0,
+      "nav_dd": -0.16799556799082904,
+      "roll90": null,
+      "roll180": null,
+      "roll365": null,
+      "cash": 8483.273691913044,
+      "positions": {
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0,
+        "SOL/USDT": 0.0,
+        "BNB/USDT": 0.0
+      },
+      "regime": {
+        "BTC/USDT": {
+          "on": false,
+          "close": 58951.51,
+          "ema": 74541.18359483621,
+          "dist_pct": -0.2091417501440932
+        },
+        "ETH/USDT": {
+          "on": false,
+          "close": 1623.09,
+          "ema": 2184.1341607454074,
+          "dist_pct": -0.2568725725868106
+        },
+        "SOL/USDT": {
+          "on": false,
+          "close": 68.88,
+          "ema": 91.35672150422533,
+          "dist_pct": -0.2460324881862772
+        },
+        "BNB/USDT": {
+          "on": false,
+          "close": 540.84,
+          "ema": 680.4276312503952,
+          "dist_pct": -0.20514691767275883
+        }
+      },
+      "pending": {},
+      "fills": []
     }
   ],
   "fills": [
@@ -2879,6 +2925,6 @@
       "reason": "趨勢結束"
     }
   ],
-  "ratio_hwm": 1.2355104974211382,
+  "ratio_hwm": 1.3182132010938383,
   "nav_hwm": 10196.18810374262
 }
